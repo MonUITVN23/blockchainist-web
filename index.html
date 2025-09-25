@@ -9,7 +9,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
 
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="src/css/styles.css">
 
     <!-- Firebase SDKs - Compatible version (no Storage) -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -17,10 +17,13 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
     <!-- File config -->
-    <script src="firebase-config.js"></script>
+    <script src="config/firebase-config.js"></script>
     
-    <!-- GitHub Storage Solution -->
-    <script src="js/storage-solution.js"></script>
+    <!-- Cloudinary Configuration -->
+    <script src="config/cloudinary-config.js"></script>
+    
+    <!-- Cloudinary Storage Solution -->
+    <script src="src/js/cloudinary-storage.js"></script>
     
     <!-- Google Fonts: Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -438,6 +441,9 @@
     <footer class="bg-black border-t border-gray-800">
         <div class="container mx-auto px-6 py-6 text-center text-gray-500">
             <p>&copy; 2025 Nhóm Nghiên cứu Blockchain, Mạng & Bảo mật. All Rights Reserved.</p>
+            <p class="mt-2">
+                <a href="admin/admin.html" class="text-gray-600 hover:text-gray-400 text-xs" title="Admin Panel">⚙️</a>
+            </p>
         </div>
     </footer>
 
@@ -448,7 +454,7 @@
     <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
 
     <!-- Main JavaScript -->
-    <script src="js/main.js"></script>
+    <script src="src/js/main.js"></script>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {

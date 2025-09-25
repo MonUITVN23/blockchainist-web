@@ -1,98 +1,192 @@
-# Nhóm Nghiên cứu Blockchain, Mạng & Bảo mật
+# Nhóm Nghiên cứu Blockchain, Mạng & Bảo mật# Nhóm Nghiên cứu Blockchain, Mạng & Bảo mật
 
-Website chính thức của nhóm nghiên cứu chuyên về công nghệ Blockchain, Mạng và An ninh mạng.
 
-## 🚀 Tính năng
 
-- **Trang chủ động**: Hiển thị thông tin về nhóm nghiên cứu
-- **Quản lý thành viên**: Tự động load thành viên từ Firebase
-- **Công bố khoa học**: Hiển thị các nghiên cứu đã được công bố
-- **Form liên hệ**: Tiếp nhận hồ sơ ứng tuyển với upload file
-- **Admin Panel**: Quản lý toàn bộ nội dung website
-- **Firebase Integration**: Lưu trữ dữ liệu real-time
-- **Responsive Design**: Tương thích trên mọi thiết bị
+## Cấu trúc thư mụcWebsite chính thức của nhóm nghiên cứu chuyên về công nghệ Blockchain, Mạng và An ninh mạng.
 
-## 🛠️ Công nghệ sử dụng
 
-- **Frontend**: HTML5, CSS3, JavaScript (ES6+)
-- **UI Framework**: Tailwind CSS
-- **Backend**: Firebase (Firestore, Storage, Auth)
-- **Animation**: AOS (Animate On Scroll)
-- **Icons**: Lucide Icons
-- **3D Effects**: Three.js
 
-## 📦 Cài đặt và Chạy
+```## 🚀 Tính năng
 
-### 1. Clone repository
-```bash
-git clone <repository-url>
-cd blockchainist-web
+📁 blockchainist-web/
+
+├── 📁 config/                 # File cấu hình- **Trang chủ động**: Hiển thị thông tin về nhóm nghiên cứu
+
+│   ├── firebase-config.js- **Quản lý thành viên**: Tự động load thành viên từ Firebase
+
+│   ├── cloudinary-config.js- **Công bố khoa học**: Hiển thị các nghiên cứu đã được công bố
+
+│   ├── firestore.rules- **Form liên hệ**: Tiếp nhận hồ sơ ứng tuyển với upload file
+
+│   ├── firestore.indexes.json- **Admin Panel**: Quản lý toàn bộ nội dung website
+
+│   └── storage.rules- **Firebase Integration**: Lưu trữ dữ liệu real-time
+
+├── 📁 src/                    # Source code- **Responsive Design**: Tương thích trên mọi thiết bị
+
+│   ├── 📁 js/                 # JavaScript files
+
+│   │   ├── main.js## 🛠️ Công nghệ sử dụng
+
+│   │   ├── cloudinary-storage.js
+
+│   │   └── admin-cloudinary.js- **Frontend**: HTML5, CSS3, JavaScript (ES6+)
+
+│   ├── 📁 css/                # Stylesheet files- **UI Framework**: Tailwind CSS
+
+│   │   └── styles.css- **Backend**: Firebase (Firestore, Storage, Auth)
+
+│   └── 📁 assets/             # Static assets- **Animation**: AOS (Animate On Scroll)
+
+├── 📁 admin/                  # Admin panel- **Icons**: Lucide Icons
+
+│   └── admin.html- **3D Effects**: Three.js
+
+├── 📁 scripts/                # Build & deployment scripts
+
+│   ├── deploy.sh## 📦 Cài đặt và Chạy
+
+│   ├── deploy.bat
+
+│   └── seed-data.js### 1. Clone repository
+
+├── index.html                 # Main website```bash
+
+├── 404.html                   # Error pagegit clone <repository-url>
+
+├── firebase.json              # Firebase configurationcd blockchainist-web
+
+└── README.md                  # This file```
+
 ```
 
 ### 2. Cấu hình Firebase
-1. Tạo project Firebase tại [Firebase Console](https://console.firebase.google.com/)
-2. Cấu hình Firestore Database
-3. Thiết lập Firebase Storage
-4. Bật Authentication (Email/Password)
-5. Cập nhật `firebase-config.js` với thông tin dự án của bạn
 
-### 3. Thiết lập Collections trong Firestore
+## Công nghệ sử dụng1. Tạo project Firebase tại [Firebase Console](https://console.firebase.google.com/)
+
+2. Cấu hình Firestore Database
+
+- **Frontend**: HTML5, CSS3, JavaScript ES6+, Tailwind CSS3. Thiết lập Firebase Storage
+
+- **Backend**: Firebase Firestore4. Bật Authentication (Email/Password)
+
+- **Authentication**: Firebase Auth5. Cập nhật `firebase-config.js` với thông tin dự án của bạn
+
+- **Image Hosting**: Cloudinary CDN
+
+- **Icons**: Lucide Icons### 3. Thiết lập Collections trong Firestore
+
+- **Animations**: AOS (Animate On Scroll)
 
 #### Collection: `members`
-```javascript
-{
-  name: "Tên thành viên",
-  role: "Chức vụ", 
-  avatar: "URL avatar"
-}
-```
 
-#### Collection: `publications`
-```javascript
+## Tính năng```javascript
+
 {
+
+- ✅ Hiển thị thông tin nhóm nghiên cứu  name: "Tên thành viên",
+
+- ✅ Profile chi tiết từng thành viên  role: "Chức vụ", 
+
+- ✅ Quản lý ứng tuyển online  avatar: "URL avatar"
+
+- ✅ Admin panel với Cloudinary upload}
+
+- ✅ Tối ưu hóa ảnh tự động```
+
+- ✅ Responsive design
+
+- ✅ SEO friendly#### Collection: `publications`
+
+```javascript
+
+## Cài đặt và triển khai{
+
   title: "Tiêu đề bài báo",
-  authors: "Danh sách tác giả",
-  journal: "Tên tạp chí",
-  year: 2025,
-  abstract: "Tóm tắt nghiên cứu",
-  url: "Link đến bài báo"
-}
-```
 
-#### Collection: `applications` (tự động tạo khi có form submission)
-```javascript
+### 1. Clone repository  authors: "Danh sách tác giả",
+
+```bash  journal: "Tên tạp chí",
+
+git clone https://github.com/MonUITVN23/blockchainist-web.git  year: 2025,
+
+cd blockchainist-web  abstract: "Tóm tắt nghiên cứu",
+
+```  url: "Link đến bài báo"
+
+}
+
+### 2. Cấu hình Firebase```
+
+- Tạo project Firebase mới
+
+- Copy cấu hình vào `config/firebase-config.js`#### Collection: `applications` (tự động tạo khi có form submission)
+
+- Thiết lập Firestore rules từ `config/firestore.rules````javascript
+
 {
-  name: "Họ tên",
-  email: "Email",
-  school: "Trường học",
-  phone: "Số điện thoại",
+
+### 3. Cấu hình Cloudinary  name: "Họ tên",
+
+- Tạo tài khoản Cloudinary  email: "Email",
+
+- Copy cấu hình vào `config/cloudinary-config.js`  school: "Trường học",
+
+- Thiết lập upload presets  phone: "Số điện thoại",
+
   message: "Thư ngỏ",
-  cvUrl: "Link CV",
-  transcriptUrl: "Link bảng điểm",
-  timestamp: "Thời gian gửi"
-}
+
+### 4. Deploy  cvUrl: "Link CV",
+
+```bash  transcriptUrl: "Link bảng điểm",
+
+# Linux/Mac  timestamp: "Thời gian gửi"
+
+./scripts/deploy.sh}
+
 ```
 
-### 4. Tạo tài khoản Admin
+# Windows
+
+scripts/deploy.bat### 4. Tạo tài khoản Admin
+
 Sử dụng Firebase Console để tạo user admin:
-1. Vào Authentication
-2. Thêm user mới với email/password
-3. Sử dụng thông tin này để đăng nhập admin panel
 
-### 5. Deploy
+# Hoặc deploy với Firebase1. Vào Authentication
 
-#### Sử dụng Firebase Hosting (Khuyên dùng)
-```bash
-# Cài đặt Firebase CLI
+firebase deploy2. Thêm user mới với email/password
+
+```3. Sử dụng thông tin này để đăng nhập admin panel
+
+
+
+## Access Points### 5. Deploy
+
+
+
+- **Website chính**: `index.html`#### Sử dụng Firebase Hosting (Khuyên dùng)
+
+- **Admin Panel**: `admin/admin.html````bash
+
+- **Error Page**: `404.html`# Cài đặt Firebase CLI
+
 npm install -g firebase-tools
 
+## Liên hệ
+
 # Đăng nhập
-firebase login
+
+- Website: [blockchainist-web.web.app]firebase login
+
+- Email: contact@blockchain-research.com
 
 # Khởi tạo hosting
-firebase init hosting
 
-# Deploy
+## Licensefirebase init hosting
+
+
+
+MIT License - xem file LICENSE để biết thêm chi tiết.# Deploy
 firebase deploy
 ```
 

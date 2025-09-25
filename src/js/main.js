@@ -1,9 +1,9 @@
-// GitHub Storage Solution - No Firebase Storage needed
-// Storage functions will be loaded from storage-solution.js
+// Cloudinary Storage Solution - No Firebase Storage needed
+// Storage functions will be loaded from cloudinary-storage.js
 
 // Wait for DOM and Firebase to be ready
 document.addEventListener('DOMContentLoaded', function() {
-    // Small delay to ensure Firebase and storage solution are loaded
+    // Small delay to ensure Firebase and Cloudinary storage are loaded
     setTimeout(() => {
         initializeWebsite();
     }, 500);
@@ -17,14 +17,20 @@ function initializeWebsite() {
         return;
     }
 
-    // Check if storage solution is loaded
-    if (typeof getRandomAvatar === 'undefined') {
-        console.error('❌ Storage solution not loaded');
-        showNotification('Lỗi: Storage solution chưa được tải', 'error');
+    // Check if Cloudinary storage solution is loaded
+    if (typeof uploadToCloudinary === 'undefined' || typeof getOptimizedUrl === 'undefined') {
+        console.error('❌ Cloudinary storage not loaded');
+        showNotification('Lỗi: Cloudinary storage chưa được tải', 'error');
         return;
     }
 
-    console.log('✅ Website initialized successfully');
+    console.log('✅ Website with Cloudinary initialized successfully');
+    
+    // Initialize Cloudinary
+    if (typeof initCloudinary !== 'undefined') {
+        initCloudinary();
+    }
+    
     loadMembers();
     loadPublications();
     setupContactForm();
@@ -43,13 +49,29 @@ async function loadMembers() {
             snapshot.forEach(doc => {
                 const member = doc.data();
                 const memberId = doc.id;
+                
+                // Use Cloudinary optimized avatar or fallback
+                let avatarUrl;
+                if (member.cloudinaryId) {
+                    // Use Cloudinary with optimization
+                    avatarUrl = getOptimizedUrl(member.cloudinaryId, 'avatar');
+                } else if (member.avatar) {
+                    // Use direct URL
+                    avatarUrl = member.avatar;
+                } else {
+                    // Use placeholder
+                    avatarUrl = getPlaceholderUrl('avatar', 96);
+                }
+                
                 html += `
                     <div class="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 text-center hover:border-sky-500 transition-colors cursor-pointer member-card" 
                          data-member-id="${memberId}" data-aos="fade-up">
                         <div class="w-24 h-24 mx-auto mb-4 rounded-full overflow-hidden bg-gray-700">
-                            <img src="${member.avatar || 'https://via.placeholder.com/96x96/4B5563/FFFFFF?text=' + (member.name?.charAt(0) || '?')}" 
+                            <img src="${avatarUrl}" 
                                  alt="${member.name || 'Thành viên'}" 
-                                 class="w-full h-full object-cover">
+                                 class="w-full h-full object-cover"
+                                 loading="lazy"
+                                 onerror="this.src='${getPlaceholderUrl('avatar', 96)}'">
                         </div>
                         <h4 class="text-lg font-bold text-white mb-2">${member.name || 'Không rõ tên'}</h4>
                         <p class="text-sky-400 mb-2">${member.role || 'Thành viên'}</p>
@@ -166,8 +188,20 @@ function hideProfileModal() {
 
 // Populate profile modal with member data
 function populateProfileModal(memberData, publications) {
-    // Basic info
-    document.getElementById('profile-avatar').src = memberData.avatar || '/default-avatar.png';
+    // Basic info with Cloudinary optimization
+    let avatarUrl;
+    if (memberData.cloudinaryId) {
+        // Use Cloudinary optimized avatar
+        avatarUrl = getOptimizedUrl(memberData.cloudinaryId, 'avatarLarge');
+    } else if (memberData.avatar) {
+        // Use direct URL
+        avatarUrl = memberData.avatar;
+    } else {
+        // Use placeholder
+        avatarUrl = getPlaceholderUrl('avatar', 300);
+    }
+    
+    document.getElementById('profile-avatar').src = avatarUrl;
     document.getElementById('profile-avatar').alt = memberData.name || 'Thành viên';
     document.getElementById('profile-name').textContent = memberData.name || 'Không rõ tên';
     document.getElementById('profile-nickname').textContent = memberData.nickname || '';
@@ -633,6 +667,27 @@ function formatDate(date) {
     }).format(date);
 }
 
+// Fallback functions for Cloudinary if not loaded yet
+function safeGetOptimizedUrl(publicId, transform) {
+    if (typeof getOptimizedUrl !== 'undefined') {
+        return getOptimizedUrl(publicId, transform);
+    }
+    // Fallback: return publicId as-is if it's a URL
+    if (publicId && publicId.startsWith('http')) {
+        return publicId;
+    }
+    return null;
+}
+
+function safeGetPlaceholderUrl(type, size) {
+    if (typeof getPlaceholderUrl !== 'undefined') {
+        return getPlaceholderUrl(type, size);
+    }
+    // Fallback placeholder
+    return `https://via.placeholder.com/${size}x${size}/374151/FFFFFF?text=${type === 'avatar' ? 'A' : 'IMG'}`;
+}
+
+console.log('✅ Main.js with Cloudinary support loaded');
 // Export functions for global access
 window.showNotification = showNotification;
 window.formatDate = formatDate;
