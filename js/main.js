@@ -1,32 +1,30 @@
-// Alternative storage solutions (no Firebase Storage)
-// Choose one of the storage solutions below:
+// GitHub Storage Solution - No Firebase Storage needed
+// Storage functions will be loaded from storage-solution.js
 
-// Option 1: GitHub Storage (completely free)
-// import { getGitHubAssetURL, uploadToGitHub } from './github-storage.js';
-
-// Option 2: Cloudinary (25GB free)
-// import cloudinaryStorage from './cloudinary-storage.js';
-
-// Option 3: ImgBB (unlimited free)
-// import ImgBBStorage from './imgbb-storage.js';
-
-// For now, we'll use a simple approach without file uploads
-const STORAGE_CONFIG = {
-  type: 'none', // 'github', 'cloudinary', 'imgbb', or 'none'
-  defaultAvatars: [
-    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
-    'https://images.unsplash.com/photo-1494790108755-2616b612b109?w=150&h=150&fit=crop&crop=face',
-    'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face',
-    'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face'
-  ]
-};
-
-// Wait for DOM to be ready
+// Wait for DOM and Firebase to be ready
 document.addEventListener('DOMContentLoaded', function() {
-    initializeWebsite();
+    // Small delay to ensure Firebase and storage solution are loaded
+    setTimeout(() => {
+        initializeWebsite();
+    }, 500);
 });
 
 function initializeWebsite() {
+    // Check if Firebase is loaded
+    if (typeof firebase === 'undefined') {
+        console.error('❌ Firebase not loaded');
+        showNotification('Lỗi: Firebase chưa được tải', 'error');
+        return;
+    }
+
+    // Check if storage solution is loaded
+    if (typeof getRandomAvatar === 'undefined') {
+        console.error('❌ Storage solution not loaded');
+        showNotification('Lỗi: Storage solution chưa được tải', 'error');
+        return;
+    }
+
+    console.log('✅ Website initialized successfully');
     loadMembers();
     loadPublications();
     setupContactForm();
@@ -151,7 +149,7 @@ function setupContactForm() {
     setupFileInput('transcript-upload', 'transcript-filename');
 }
 
-// Handle contact form submission (without file upload)
+// Handle contact form submission (simplified without file storage)
 async function handleContactSubmit(e) {
     e.preventDefault();
     
@@ -163,7 +161,7 @@ async function handleContactSubmit(e) {
     submitButton.innerHTML = '<div class="animate-spin rounded-full h-5 w-5 border-b-2 border-white mx-auto"></div>';
     
     try {
-        // Get form data (without file uploads for now)
+        // Get form data
         const formData = {
             name: document.getElementById('name').value,
             email: document.getElementById('email').value,
@@ -171,19 +169,40 @@ async function handleContactSubmit(e) {
             phone: document.getElementById('phone').value,
             message: document.getElementById('message').value,
             timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            // Note: File uploads will be handled differently based on chosen storage solution
-            hasCV: document.getElementById('cv-upload').files.length > 0,
-            hasTranscript: document.getElementById('transcript-upload').files.length > 0
+            status: 'pending'
         };
         
-        // For file uploads, we'll implement alternative solutions later
-        // For now, save form data without files
+        // Handle file information (store metadata only)
+        const cvFile = document.getElementById('cv-upload').files[0];
+        const transcriptFile = document.getElementById('transcript-upload').files[0];
         
-        // Save to Firestore
+        if (cvFile) {
+            formData.cvInfo = {
+                name: cvFile.name,
+                size: cvFile.size,
+                type: cvFile.type,
+                hasFile: true
+            };
+        }
+        
+        if (transcriptFile) {
+            formData.transcriptInfo = {
+                name: transcriptFile.name,
+                size: transcriptFile.size,
+                type: transcriptFile.type,
+                hasFile: true
+            };
+        }
+        
+        // Save to Firestore (without actual files)
         await db.collection('applications').add(formData);
         
-        // Show success message
-        showNotification('Hồ sơ của bạn đã được gửi thành công! Chúng tôi sẽ liên hệ với bạn sớm nhất.', 'success');
+        // Show success message with instructions
+        let message = 'Thông tin của bạn đã được gửi thành công! ';
+        if (cvFile || transcriptFile) {
+            message += 'Vui lòng gửi CV và bảng điểm qua email: admin@blockchainist.edu.vn với tiêu đề "Hồ sơ ứng tuyển - ' + formData.name + '"';
+        }
+        showNotification(message, 'success');
         
         // Reset form
         e.target.reset();

@@ -1,15 +1,32 @@
-// Firebase services
-const storage = firebase.storage();
+// Admin Panel - No Firebase Storage needed
+// Using GitHub storage solution for assets
 
 // Auth state management
 let currentUser = null;
 
 // Initialize admin functions when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
-    initializeAdmin();
+    // Small delay to ensure Firebase and storage solution are loaded
+    setTimeout(() => {
+        initializeAdmin();
+    }, 500);
 });
 
 function initializeAdmin() {
+    // Check if Firebase is loaded
+    if (typeof firebase === 'undefined') {
+        console.error('❌ Firebase not loaded');
+        return;
+    }
+
+    // Check if storage solution is loaded
+    if (typeof getRandomAvatar === 'undefined') {
+        console.error('❌ Storage solution not loaded');
+        return;
+    }
+
+    console.log('✅ Admin panel initialized');
+
     // Check auth state
     firebase.auth().onAuthStateChanged((user) => {
         if (user) {
@@ -18,6 +35,7 @@ function initializeAdmin() {
             loadApplications();
             loadMembers();
             loadPublications();
+            loadSettings();
         } else {
             showLoginForm();
         }
@@ -178,10 +196,23 @@ async function loadApplications() {
                             <p class="text-white">${data.message}</p>
                         </div>
                     ` : ''}
-                    <div class="flex space-x-2">
-                        ${data.cvUrl ? `<a href="${data.cvUrl}" target="_blank" class="text-sky-400 hover:text-sky-300 text-sm">Xem CV</a>` : ''}
-                        ${data.transcriptUrl ? `<a href="${data.transcriptUrl}" target="_blank" class="text-green-400 hover:text-green-300 text-sm">Xem Bảng điểm</a>` : ''}
-                        <button onclick="deleteApplication('${doc.id}')" class="text-red-400 hover:text-red-300 text-sm ml-auto">Xóa</button>
+                    <div class="flex space-x-2 flex-wrap">
+                        ${data.cvInfo ? `
+                            <span class="text-sky-400 text-sm">
+                                <i class="fas fa-file-pdf mr-1"></i>CV: ${data.cvInfo.name} (${(data.cvInfo.size/1024/1024).toFixed(2)}MB)
+                            </span>
+                        ` : '<span class="text-gray-500 text-sm">Không có CV</span>'}
+                        ${data.transcriptInfo ? `
+                            <span class="text-green-400 text-sm">
+                                <i class="fas fa-file-pdf mr-1"></i>Bảng điểm: ${data.transcriptInfo.name} (${(data.transcriptInfo.size/1024/1024).toFixed(2)}MB)
+                            </span>
+                        ` : '<span class="text-gray-500 text-sm">Không có bảng điểm</span>'}
+                        <button onclick="deleteApplication('${doc.id}')" class="text-red-400 hover:text-red-300 text-sm ml-auto">
+                            <i class="fas fa-trash mr-1"></i>Xóa
+                        </button>
+                        <button onclick="contactApplicant('${data.email}', '${data.name}')" class="text-blue-400 hover:text-blue-300 text-sm">
+                            <i class="fas fa-envelope mr-1"></i>Liên hệ
+                        </button>
                     </div>
                 </div>
             `;
@@ -202,10 +233,32 @@ async function deleteApplication(id) {
     try {
         await db.collection('applications').doc(id).delete();
         loadApplications(); // Reload list
+        showNotification('Đã xóa hồ sơ thành công', 'success');
     } catch (error) {
         console.error('Error deleting application:', error);
-        alert('Lỗi khi xóa hồ sơ');
+        showNotification('Lỗi khi xóa hồ sơ', 'error');
     }
+}
+
+// Contact applicant function
+function contactApplicant(email, name) {
+    const subject = encodeURIComponent(`Phản hồi hồ sơ ứng tuyển - ${name}`);
+    const body = encodeURIComponent(`Chào ${name},\n\nCảm ơn bạn đã quan tâm và gửi hồ sơ ứng tuyển cho nhóm nghiên cứu chúng tôi.\n\nVui lòng gửi CV và bảng điểm qua email này để chúng tôi có thể xem xét hồ sơ của bạn.\n\nTrân trọng,\nNhóm Nghiên cứu Blockchain, Mạng & Bảo mật`);
+    
+    window.open(`mailto:${email}?subject=${subject}&body=${body}`, '_blank');
+}
+
+// Show notification function
+function showNotification(message, type = 'info') {
+    // Simple notification for admin panel
+    const notification = document.createElement('div');
+    notification.className = `fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg max-w-md`;
+    notification.className += type === 'success' ? ' bg-green-600' : 
+                             type === 'error' ? ' bg-red-600' : ' bg-blue-600';
+    notification.innerHTML = `<p class="text-white">${message}</p>`;
+    
+    document.body.appendChild(notification);
+    setTimeout(() => notification.remove(), 3000);
 }
 
 // Members Management
@@ -374,17 +427,36 @@ async function deletePublication(id) {
 }
 
 // Settings Management
+async function loadSettings() {
+    try {
+        const doc = await db.collection('settings').doc('general').get();
+        if (doc.exists) {
+            const data = doc.data();
+            const emailInput = document.getElementById('notification-email');
+            if (emailInput) {
+                emailInput.value = data.notificationEmail || '';
+            }
+        }
+    } catch (error) {
+        console.error('Error loading settings:', error);
+    }
+}
+
 async function saveSettings() {
-    const notificationEmail = document.getElementById('notification-email').value;
+    const emailInput = document.getElementById('notification-email');
+    if (!emailInput) return;
+    
+    const notificationEmail = emailInput.value;
     
     try {
         await db.collection('settings').doc('general').set({
-            notificationEmail: notificationEmail
+            notificationEmail: notificationEmail,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
         
-        alert('Cài đặt đã được lưu');
+        showNotification('Cài đặt đã được lưu', 'success');
     } catch (error) {
         console.error('Error saving settings:', error);
-        alert('Lỗi khi lưu cài đặt');
+        showNotification('Lỗi khi lưu cài đặt', 'error');
     }
 }
