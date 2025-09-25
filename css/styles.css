@@ -59,6 +59,59 @@ html {
     display: none;
 }
 
+/* File upload styles */
+.file-upload-area {
+    border: 2px dashed #4b5563;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    text-align: center;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.file-upload-area:hover {
+    border-color: #0ea5e9;
+    background-color: rgba(14, 165, 233, 0.05);
+}
+
+.file-upload-area.drag-over {
+    border-color: #0ea5e9;
+    background-color: rgba(14, 165, 233, 0.1);
+}
+
+/* Avatar preview styles */
+.avatar-preview {
+    position: relative;
+}
+
+.avatar-preview img {
+    transition: all 0.3s;
+}
+
+.avatar-preview:hover img {
+    transform: scale(1.05);
+}
+
+/* Upload progress bar */
+.upload-progress-bar {
+    transition: width 0.3s ease;
+}
+
+/* Token input security */
+#github-token {
+    font-family: 'Courier New', monospace;
+}
+
+/* Preview buttons */
+.preview-buttons {
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.avatar-preview:hover .preview-buttons {
+    opacity: 1;
+}
+
 /* Hover effects */
 .hover-lift {
     transition: transform 0.2s;

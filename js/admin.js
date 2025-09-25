@@ -318,11 +318,15 @@ function showMemberModal(editMode = false, memberId = null, memberData = {}) {
     const title = document.getElementById('member-modal-title');
     const form = document.getElementById('member-form');
     
+    // Reset form and states
+    selectedAvatarFile = null;
+    currentAvatarUrl = memberData.avatar || null;
+    
     // Set form values
     document.getElementById('member-name').value = memberData.name || '';
     document.getElementById('member-nickname').value = memberData.nickname || '';
     document.getElementById('member-role').value = memberData.role || '';
-    document.getElementById('member-avatar').value = memberData.avatar || '';
+    document.getElementById('member-avatar-url').value = '';
     document.getElementById('member-google-scholar').value = memberData.googleScholar || '';
     document.getElementById('member-orcid').value = memberData.orcid || '';
     document.getElementById('member-bio').value = memberData.bio || '';
@@ -333,6 +337,22 @@ function showMemberModal(editMode = false, memberId = null, memberData = {}) {
     document.getElementById('member-achievements').value = 
         (memberData.achievements || []).join('\n');
     
+    // Load saved GitHub token
+    const savedToken = localStorage.getItem('github_token');
+    if (savedToken) {
+        document.getElementById('github-token').value = savedToken;
+    }
+    
+    // Show current avatar if editing
+    if (editMode) {
+        showCurrentAvatar(memberData.avatar);
+    } else {
+        document.getElementById('current-avatar-display').classList.add('hidden');
+    }
+    
+    // Hide preview initially
+    hideAvatarPreview();
+    
     // Set title and form action
     title.textContent = editMode ? 'Sửa thành viên' : 'Thêm thành viên';
     form.setAttribute('data-member-id', memberId || '');
@@ -340,6 +360,12 @@ function showMemberModal(editMode = false, memberId = null, memberData = {}) {
     
     modal.classList.remove('hidden');
     modal.classList.add('flex');
+    
+    // Setup upload functionality if not already done
+    if (!document.getElementById('avatar-file-input').hasEventListener) {
+        setupAvatarUpload();
+        document.getElementById('avatar-file-input').hasEventListener = true;
+    }
 }
 
 function hideMemberModal() {
@@ -351,80 +377,457 @@ function hideMemberModal() {
 async function handleMemberSubmit(e) {
     e.preventDefault();
     
-    const name = document.getElementById('member-name').value;
-    const nickname = document.getElementById('member-nickname').value;
-    const role = document.getElementById('member-role').value;
-    const avatar = document.getElementById('member-avatar').value;
-    const googleScholar = document.getElementById('member-google-scholar').value;
-    const orcid = document.getElementById('member-orcid').value;
-    const bio = document.getElementById('member-bio').value;
-    const researchInterests = document.getElementById('member-research-interests').value
-        .split('\n').filter(item => item.trim()).map(item => item.trim());
-    const education = document.getElementById('member-education').value
-        .split('\n').filter(item => item.trim()).map(item => item.trim());
-    const achievements = document.getElementById('member-achievements').value
-        .split('\n').filter(item => item.trim()).map(item => item.trim());
+    const saveButton = e.target.querySelector('button[type="submit"]');
+    const saveText = document.getElementById('save-member-text');
+    const saveLoading = document.getElementById('save-member-loading');
+    const githubToken = document.getElementById('github-token').value.trim();
     
-    const form = e.target;
-    const memberId = form.getAttribute('data-member-id');
-    const editMode = form.getAttribute('data-edit-mode') === 'true';
-    
-    const memberData = {
-        name: name,
-        nickname: nickname,
-        role: role,
-        avatar: avatar,
-        googleScholar: googleScholar,
-        orcid: orcid,
-        bio: bio,
-        researchInterests: researchInterests,
-        education: education,
-        achievements: achievements
-    };
+    // Show loading state
+    saveButton.disabled = true;
+    saveText.classList.add('hidden');
+    saveLoading.classList.remove('hidden');
     
     try {
+        let avatarUrl = currentAvatarUrl; // Keep existing avatar by default
+        
+        // Handle avatar upload
+        if (selectedAvatarFile && githubToken) {
+            // Upload file to GitHub
+            const progressInterval = showUploadProgress();
+            
+            try {
+                const filename = generateUniqueFilename(selectedAvatarFile.name);
+                const uploadResult = await uploadToGitHub(selectedAvatarFile, filename, githubToken, 'avatars');
+                
+                avatarUrl = uploadResult.url;
+                
+                clearInterval(progressInterval);
+                document.getElementById('upload-progress-bar').style.width = '100%';
+                document.getElementById('upload-status').textContent = 'Tải lên thành công!';
+                
+                setTimeout(hideUploadProgress, 1000);
+                
+                showNotification('Đã tải ảnh lên GitHub thành công!', 'success');
+                
+            } catch (uploadError) {
+                clearInterval(progressInterval);
+                hideUploadProgress();
+                
+                // If upload fails, ask user if they want to continue
+                const continueWithoutUpload = confirm(
+                    `Lỗi khi tải ảnh lên GitHub: ${uploadError.message}\n\n` +
+                    'Bạn có muốn tiếp tục lưu thành viên mà không có ảnh mới không?'
+                );
+                
+                if (!continueWithoutUpload) {
+                    throw new Error('Người dùng hủy do lỗi upload ảnh');
+                }
+            }
+        } else if (document.getElementById('member-avatar-url').value.trim()) {
+            // Use URL instead
+            avatarUrl = document.getElementById('member-avatar-url').value.trim();
+        } else if (selectedAvatarFile && !githubToken) {
+            throw new Error('Cần GitHub token để tải ảnh lên. Vui lòng nhập token hoặc sử dụng URL.');
+        }
+        
+        // Collect form data
+        const name = document.getElementById('member-name').value;
+        const nickname = document.getElementById('member-nickname').value;
+        const role = document.getElementById('member-role').value;
+        const googleScholar = document.getElementById('member-google-scholar').value;
+        const orcid = document.getElementById('member-orcid').value;
+        const bio = document.getElementById('member-bio').value;
+        const researchInterests = document.getElementById('member-research-interests').value
+            .split('\n').filter(item => item.trim()).map(item => item.trim());
+        const education = document.getElementById('member-education').value
+            .split('\n').filter(item => item.trim()).map(item => item.trim());
+        const achievements = document.getElementById('member-achievements').value
+            .split('\n').filter(item => item.trim()).map(item => item.trim());
+        
+        const form = e.target;
+        const memberId = form.getAttribute('data-member-id');
+        const editMode = form.getAttribute('data-edit-mode') === 'true';
+        
+        const memberData = {
+            name: name,
+            nickname: nickname,
+            role: role,
+            avatar: avatarUrl,
+            googleScholar: googleScholar,
+            orcid: orcid,
+            bio: bio,
+            researchInterests: researchInterests,
+            education: education,
+            achievements: achievements,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        
+        // Save to Firebase
         if (editMode && memberId) {
             await db.collection('members').doc(memberId).update(memberData);
         } else {
+            memberData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
             await db.collection('members').add(memberData);
         }
         
+        // Success
         hideMemberModal();
         loadMembers();
-        showNotification('Đã lưu thành viên thành công', 'success');
+        showNotification('Đã lưu thành viên thành công!', 'success');
+        
+        // Store token in localStorage for convenience (optional)
+        if (githubToken) {
+            localStorage.setItem('github_token', githubToken);
+        }
         
     } catch (error) {
         console.error('Error saving member:', error);
-        showNotification('Lỗi khi lưu thành viên', 'error');
+        showNotification('Lỗi khi lưu thành viên: ' + error.message, 'error');
+    } finally {
+        // Reset button state
+        saveButton.disabled = false;
+        saveText.classList.remove('hidden');
+        saveLoading.classList.add('hidden');
+        hideUploadProgress();
     }
 }
 
-async function editMember(id) {
-    try {
-        const doc = await db.collection('members').doc(id).get();
-        if (doc.exists) {
-            const memberData = doc.data();
-            showMemberModal(true, id, memberData);
+// Updated showMemberModal function
+function showMemberModal(editMode = false, memberId = null, memberData = {}) {
+    const modal = document.getElementById('member-modal');
+    const title = document.getElementById('member-modal-title');
+    const form = document.getElementById('member-form');
+    
+    // Reset form and states
+    selectedAvatarFile = null;
+    currentAvatarUrl = memberData.avatar || null;
+    
+    // Set form values
+    document.getElementById('member-name').value = memberData.name || '';
+    document.getElementById('member-nickname').value = memberData.nickname || '';
+    document.getElementById('member-role').value = memberData.role || '';
+    document.getElementById('member-avatar-url').value = '';
+    document.getElementById('member-google-scholar').value = memberData.googleScholar || '';
+    document.getElementById('member-orcid').value = memberData.orcid || '';
+    document.getElementById('member-bio').value = memberData.bio || '';
+    document.getElementById('member-research-interests').value = 
+        (memberData.researchInterests || []).join('\n');
+    document.getElementById('member-education').value = 
+        (memberData.education || []).join('\n');
+    document.getElementById('member-achievements').value = 
+        (memberData.achievements || []).join('\n');
+    
+    // Load saved GitHub token
+    const savedToken = localStorage.getItem('github_token');
+    if (savedToken) {
+        document.getElementById('github-token').value = savedToken;
+    }
+    
+    // Show current avatar if editing
+    if (editMode) {
+        showCurrentAvatar(memberData.avatar);
+    } else {
+        document.getElementById('current-avatar-display').classList.add('hidden');
+    }
+    
+    // Hide preview initially
+    hideAvatarPreview();
+    
+    // Set title and form action
+    title.textContent = editMode ? 'Sửa thành viên' : 'Thêm thành viên';
+    form.setAttribute('data-member-id', memberId || '');
+    form.setAttribute('data-edit-mode', editMode);
+    
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    
+    // Setup upload functionality if not already done
+    if (!document.getElementById('avatar-file-input').hasEventListener) {
+        setupAvatarUpload();
+        document.getElementById('avatar-file-input').hasEventListener = true;
+    }
+}
+
+// Enhanced admin.js với file upload functionality
+let selectedAvatarFile = null;
+let currentAvatarUrl = null;
+
+// Setup file upload functionality
+function setupAvatarUpload() {
+    const fileInput = document.getElementById('avatar-file-input');
+    const urlInput = document.getElementById('member-avatar-url');
+    const previewSection = document.getElementById('avatar-preview');
+    const previewImage = document.getElementById('avatar-preview-image');
+    const fileInfo = document.getElementById('avatar-file-info');
+    const compressBtn = document.getElementById('compress-avatar-btn');
+    const removeBtn = document.getElementById('remove-avatar-btn');
+    
+    // File input change handler
+    fileInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            selectedAvatarFile = file;
+            showAvatarPreview(file);
+            urlInput.value = ''; // Clear URL input
         }
-    } catch (error) {
-        console.error('Error loading member for edit:', error);
-        showNotification('Lỗi khi tải thông tin thành viên', 'error');
+    });
+    
+    // URL input change handler
+    urlInput.addEventListener('input', function(e) {
+        const url = e.target.value.trim();
+        if (url) {
+            selectedAvatarFile = null;
+            fileInput.value = '';
+            showUrlPreview(url);
+        } else {
+            hideAvatarPreview();
+        }
+    });
+    
+    // Compress button handler
+    compressBtn.addEventListener('click', async function() {
+        if (selectedAvatarFile) {
+            try {
+                compressBtn.disabled = true;
+                compressBtn.textContent = 'Đang nén...';
+                
+                const compressed = await compressImage(selectedAvatarFile, 400, 0.8);
+                selectedAvatarFile = compressed;
+                showAvatarPreview(compressed);
+                
+                showNotification('Đã nén ảnh thành công', 'success');
+            } catch (error) {
+                showNotification('Lỗi khi nén ảnh: ' + error.message, 'error');
+            } finally {
+                compressBtn.disabled = false;
+                compressBtn.textContent = 'Nén ảnh';
+            }
+        }
+    });
+    
+    // Remove button handler
+    removeBtn.addEventListener('click', function() {
+        selectedAvatarFile = null;
+        fileInput.value = '';
+        urlInput.value = '';
+        hideAvatarPreview();
+    });
+}
+
+// Show avatar preview for file
+function showAvatarPreview(file) {
+    const previewSection = document.getElementById('avatar-preview');
+    const previewImage = document.getElementById('avatar-preview-image');
+    const fileInfo = document.getElementById('avatar-file-info');
+    
+    // Create object URL for preview
+    const objectUrl = URL.createObjectURL(file);
+    previewImage.src = objectUrl;
+    
+    // Show file info
+    const sizeInMB = (file.size / 1024 / 1024).toFixed(2);
+    fileInfo.textContent = `${file.name} (${sizeInMB} MB, ${file.type})`;
+    
+    previewSection.classList.remove('hidden');
+    
+    // Cleanup old object URL
+    previewImage.onload = () => URL.revokeObjectURL(objectUrl);
+}
+
+// Show preview for URL
+function showUrlPreview(url) {
+    const previewSection = document.getElementById('avatar-preview');
+    const previewImage = document.getElementById('avatar-preview-image');
+    const fileInfo = document.getElementById('avatar-file-info');
+    const compressBtn = document.getElementById('compress-avatar-btn');
+    
+    previewImage.src = url;
+    fileInfo.textContent = `URL: ${url}`;
+    
+    // Hide compress button for URL
+    compressBtn.classList.add('hidden');
+    
+    previewSection.classList.remove('hidden');
+}
+
+// Hide avatar preview
+function hideAvatarPreview() {
+    const previewSection = document.getElementById('avatar-preview');
+    previewSection.classList.add('hidden');
+    
+    // Show compress button again
+    document.getElementById('compress-avatar-btn').classList.remove('hidden');
+}
+
+// Show current avatar in edit mode
+function showCurrentAvatar(avatarUrl) {
+    const currentAvatarDisplay = document.getElementById('current-avatar-display');
+    const currentAvatarImage = document.getElementById('current-avatar-image');
+    const currentAvatarUrlText = document.getElementById('current-avatar-url');
+    
+    if (avatarUrl) {
+        currentAvatarImage.src = avatarUrl;
+        currentAvatarUrlText.textContent = avatarUrl;
+        currentAvatarDisplay.classList.remove('hidden');
+        currentAvatarUrl = avatarUrl;
+    } else {
+        currentAvatarDisplay.classList.add('hidden');
+        currentAvatarUrl = null;
     }
 }
 
-async function deleteMember(id) {
-    if (!confirm('Bạn có chắc chắn muốn xóa thành viên này?')) return;
+// Upload progress display
+function showUploadProgress() {
+    const progressSection = document.getElementById('upload-progress');
+    const progressBar = document.getElementById('upload-progress-bar');
+    const statusText = document.getElementById('upload-status');
+    
+    progressSection.classList.remove('hidden');
+    progressBar.style.width = '0%';
+    statusText.textContent = 'Đang chuẩn bị tải lên...';
+    
+    // Simulate progress (since GitHub API doesn't provide real progress)
+    let progress = 0;
+    const interval = setInterval(() => {
+        progress += Math.random() * 30;
+        if (progress > 90) progress = 90;
+        
+        progressBar.style.width = progress + '%';
+        statusText.textContent = `Đang tải lên... ${Math.round(progress)}%`;
+        
+        if (progress >= 90) {
+            clearInterval(interval);
+        }
+    }, 200);
+    
+    return interval;
+}
+
+function hideUploadProgress() {
+    const progressSection = document.getElementById('upload-progress');
+    progressSection.classList.add('hidden');
+}
+
+// Updated handleMemberSubmit function
+async function handleMemberSubmit(e) {
+    e.preventDefault();
+    
+    const saveButton = e.target.querySelector('button[type="submit"]');
+    const saveText = document.getElementById('save-member-text');
+    const saveLoading = document.getElementById('save-member-loading');
+    const githubToken = document.getElementById('github-token').value.trim();
+    
+    // Show loading state
+    saveButton.disabled = true;
+    saveText.classList.add('hidden');
+    saveLoading.classList.remove('hidden');
     
     try {
-        await db.collection('members').doc(id).delete();
+        let avatarUrl = currentAvatarUrl; // Keep existing avatar by default
+        
+        // Handle avatar upload
+        if (selectedAvatarFile && githubToken) {
+            // Upload file to GitHub
+            const progressInterval = showUploadProgress();
+            
+            try {
+                const filename = generateUniqueFilename(selectedAvatarFile.name);
+                const uploadResult = await uploadToGitHub(selectedAvatarFile, filename, githubToken, 'avatars');
+                
+                avatarUrl = uploadResult.url;
+                
+                clearInterval(progressInterval);
+                document.getElementById('upload-progress-bar').style.width = '100%';
+                document.getElementById('upload-status').textContent = 'Tải lên thành công!';
+                
+                setTimeout(hideUploadProgress, 1000);
+                
+                showNotification('Đã tải ảnh lên GitHub thành công!', 'success');
+                
+            } catch (uploadError) {
+                clearInterval(progressInterval);
+                hideUploadProgress();
+                
+                // If upload fails, ask user if they want to continue
+                const continueWithoutUpload = confirm(
+                    `Lỗi khi tải ảnh lên GitHub: ${uploadError.message}\n\n` +
+                    'Bạn có muốn tiếp tục lưu thành viên mà không có ảnh mới không?'
+                );
+                
+                if (!continueWithoutUpload) {
+                    throw new Error('Người dùng hủy do lỗi upload ảnh');
+                }
+            }
+        } else if (document.getElementById('member-avatar-url').value.trim()) {
+            // Use URL instead
+            avatarUrl = document.getElementById('member-avatar-url').value.trim();
+        } else if (selectedAvatarFile && !githubToken) {
+            throw new Error('Cần GitHub token để tải ảnh lên. Vui lòng nhập token hoặc sử dụng URL.');
+        }
+        
+        // Collect form data
+        const name = document.getElementById('member-name').value;
+        const nickname = document.getElementById('member-nickname').value;
+        const role = document.getElementById('member-role').value;
+        const googleScholar = document.getElementById('member-google-scholar').value;
+        const orcid = document.getElementById('member-orcid').value;
+        const bio = document.getElementById('member-bio').value;
+        const researchInterests = document.getElementById('member-research-interests').value
+            .split('\n').filter(item => item.trim()).map(item => item.trim());
+        const education = document.getElementById('member-education').value
+            .split('\n').filter(item => item.trim()).map(item => item.trim());
+        const achievements = document.getElementById('member-achievements').value
+            .split('\n').filter(item => item.trim()).map(item => item.trim());
+        
+        const form = e.target;
+        const memberId = form.getAttribute('data-member-id');
+        const editMode = form.getAttribute('data-edit-mode') === 'true';
+        
+        const memberData = {
+            name: name,
+            nickname: nickname,
+            role: role,
+            avatar: avatarUrl,
+            googleScholar: googleScholar,
+            orcid: orcid,
+            bio: bio,
+            researchInterests: researchInterests,
+            education: education,
+            achievements: achievements,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        
+        // Save to Firebase
+        if (editMode && memberId) {
+            await db.collection('members').doc(memberId).update(memberData);
+        } else {
+            memberData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+            await db.collection('members').add(memberData);
+        }
+        
+        // Success
+        hideMemberModal();
         loadMembers();
+        showNotification('Đã lưu thành viên thành công!', 'success');
+        
+        // Store token in localStorage for convenience (optional)
+        if (githubToken) {
+            localStorage.setItem('github_token', githubToken);
+        }
+        
     } catch (error) {
-        console.error('Error deleting member:', error);
-        alert('Lỗi khi xóa thành viên');
+        console.error('Error saving member:', error);
+        showNotification('Lỗi khi lưu thành viên: ' + error.message, 'error');
+    } finally {
+        // Reset button state
+        saveButton.disabled = false;
+        saveText.classList.remove('hidden');
+        saveLoading.classList.add('hidden');
+        hideUploadProgress();
     }
 }
 
-// Publications Management - Updated with better error handling  
+// Publications Management
 async function loadPublications() {
     const listDiv = document.getElementById('publications-list');
     
@@ -442,13 +845,26 @@ async function loadPublications() {
             
             html += `
                 <div class="bg-gray-700 p-6 rounded-lg border border-gray-600">
-                    <h4 class="text-lg font-semibold text-white mb-2">${data.title}</h4>
-                    <p class="text-sky-400 mb-2">${data.authors || 'Không rõ tác giả'}</p>
-                    <p class="text-gray-400 text-sm mb-2">${data.journal || 'Không rõ tạp chí'} (${data.year || 'N/A'})</p>
-                    ${data.abstract ? `<p class="text-gray-300 text-sm">${data.abstract}</p>` : ''}
-                    <div class="flex justify-end space-x-2 mt-4">
-                        ${data.url ? `<a href="${data.url}" target="_blank" class="text-sky-400 hover:text-sky-300 text-sm">Xem bài báo</a>` : ''}
-                        <button onclick="deletePublication('${doc.id}')" class="text-red-400 hover:text-red-300 text-sm">Xóa</button>
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="text-xs px-2 py-1 rounded ${getPublicationTypeColor(data.type)} text-white">
+                            ${data.type || 'Paper'}
+                        </span>
+                        <span class="text-sm text-gray-400">${data.year || 'N/A'}</span>
+                    </div>
+                    <h4 class="text-lg font-bold text-white mb-2">${data.title || 'Tiêu đề không rõ'}</h4>
+                    <p class="text-sky-400 mb-2">${data.authors || 'Tác giả không rõ'}</p>
+                    <p class="text-gray-400 text-sm mb-4"><em>${data.journal || 'Tạp chí không rõ'}</em></p>
+                    <div class="flex justify-between items-center">
+                        <div class="flex space-x-4 text-sm text-gray-400">
+                            ${data.citations ? `<span><i data-lucide="quote" class="w-4 h-4 inline mr-1"></i>${data.citations}</span>` : ''}
+                            ${data.doi ? `<span>DOI: ${data.doi}</span>` : ''}
+                        </div>
+                        <div class="flex space-x-2">
+                            <button onclick="editPublication('${doc.id}')" 
+                                    class="text-sky-400 hover:text-sky-300 text-sm">Sửa</button>
+                            <button onclick="deletePublication('${doc.id}')" 
+                                    class="text-red-400 hover:text-red-300 text-sm">Xóa</button>
+                        </div>
                     </div>
                 </div>
             `;
@@ -467,19 +883,41 @@ async function loadPublications() {
     }
 }
 
-async function deletePublication(id) {
-    if (!confirm('Bạn có chắc chắn muốn xóa công bố này?')) return;
-    
-    try {
-        await db.collection('publications').doc(id).delete();
-        loadPublications();
-    } catch (error) {
-        console.error('Error deleting publication:', error);
-        alert('Lỗi khi xóa công bố');
+function editPublication(id) {
+    // Placeholder for edit publication functionality
+    showNotification('Tính năng sửa publication đang được phát triển', 'info');
+}
+
+function deletePublication(id) {
+    if (confirm('Bạn có chắc chắn muốn xóa publication này?')) {
+        db.collection('publications').doc(id).delete()
+            .then(() => {
+                showNotification('Đã xóa publication thành công', 'success');
+                loadPublications();
+            })
+            .catch(error => {
+                showNotification('Lỗi khi xóa publication: ' + error.message, 'error');
+            });
     }
 }
 
-// Settings Management - Updated with better error handling
+// Helper function to get publication type color
+function getPublicationTypeColor(type) {
+    switch (type) {
+        case 'Journal Article':
+            return 'bg-blue-600';
+        case 'Conference Paper':
+            return 'bg-green-600';
+        case 'Book Chapter':
+            return 'bg-purple-600';
+        case 'Magazine Article':
+            return 'bg-orange-600';
+        default:
+            return 'bg-gray-600';
+    }
+}
+
+// Settings Management
 async function loadSettings() {
     try {
         // Check if user is authenticated
@@ -504,21 +942,219 @@ async function loadSettings() {
     }
 }
 
-async function saveSettings() {
-    const emailInput = document.getElementById('notification-email');
-    if (!emailInput) return;
+// Setup file upload functionality
+function setupAvatarUpload() {
+    const fileInput = document.getElementById('avatar-file-input');
+    const urlInput = document.getElementById('member-avatar-url');
+    const previewSection = document.getElementById('avatar-preview');
+    const previewImage = document.getElementById('avatar-preview-image');
+    const fileInfo = document.getElementById('avatar-file-info');
+    const compressBtn = document.getElementById('compress-avatar-btn');
+    const removeBtn = document.getElementById('remove-avatar-btn');
     
-    const notificationEmail = emailInput.value;
+    if (!fileInput) return; // Elements might not be loaded yet
     
-    try {
-        await db.collection('settings').doc('general').set({
-            notificationEmail: notificationEmail,
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        }, { merge: true });
+    // File input change handler
+    fileInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            selectedAvatarFile = file;
+            showAvatarPreview(file);
+            if (urlInput) urlInput.value = ''; // Clear URL input
+        }
+    });
+    
+    // URL input change handler
+    if (urlInput) {
+        urlInput.addEventListener('input', function(e) {
+            const url = e.target.value.trim();
+            if (url) {
+                selectedAvatarFile = null;
+                fileInput.value = '';
+                showUrlPreview(url);
+            } else {
+                hideAvatarPreview();
+            }
+        });
+    }
+    
+    // Compress button handler
+    if (compressBtn) {
+        compressBtn.addEventListener('click', async function() {
+            if (selectedAvatarFile && typeof compressImage !== 'undefined') {
+                try {
+                    compressBtn.disabled = true;
+                    compressBtn.textContent = 'Đang nén...';
+                    
+                    const compressed = await compressImage(selectedAvatarFile, 400, 0.8);
+                    selectedAvatarFile = compressed;
+                    showAvatarPreview(compressed);
+                    
+                    showNotification('Đã nén ảnh thành công', 'success');
+                } catch (error) {
+                    showNotification('Lỗi khi nén ảnh: ' + error.message, 'error');
+                } finally {
+                    compressBtn.disabled = false;
+                    compressBtn.textContent = 'Nén ảnh';
+                }
+            }
+        });
+    }
+    
+    // Remove button handler
+    if (removeBtn) {
+        removeBtn.addEventListener('click', function() {
+            selectedAvatarFile = null;
+            fileInput.value = '';
+            if (urlInput) urlInput.value = '';
+            hideAvatarPreview();
+        });
+    }
+}
+
+// Show avatar preview for file
+function showAvatarPreview(file) {
+    const previewSection = document.getElementById('avatar-preview');
+    const previewImage = document.getElementById('avatar-preview-image');
+    const fileInfo = document.getElementById('avatar-file-info');
+    
+    if (!previewSection || !previewImage || !fileInfo) return;
+    
+    // Create object URL for preview
+    const objectUrl = URL.createObjectURL(file);
+    previewImage.src = objectUrl;
+    
+    // Show file info
+    const sizeInMB = (file.size / 1024 / 1024).toFixed(2);
+    fileInfo.textContent = `${file.name} (${sizeInMB} MB, ${file.type})`;
+    
+    previewSection.classList.remove('hidden');
+    
+    // Cleanup old object URL
+    previewImage.onload = () => URL.revokeObjectURL(objectUrl);
+}
+
+// Show preview for URL
+function showUrlPreview(url) {
+    const previewSection = document.getElementById('avatar-preview');
+    const previewImage = document.getElementById('avatar-preview-image');
+    const fileInfo = document.getElementById('avatar-file-info');
+    const compressBtn = document.getElementById('compress-avatar-btn');
+    
+    if (!previewSection || !previewImage || !fileInfo) return;
+    
+    previewImage.src = url;
+    fileInfo.textContent = `URL: ${url}`;
+    
+    // Hide compress button for URL
+    if (compressBtn) compressBtn.classList.add('hidden');
+    
+    previewSection.classList.remove('hidden');
+}
+
+// Hide avatar preview
+function hideAvatarPreview() {
+    const previewSection = document.getElementById('avatar-preview');
+    if (previewSection) {
+        previewSection.classList.add('hidden');
+    }
+    
+    // Show compress button again
+    const compressBtn = document.getElementById('compress-avatar-btn');
+    if (compressBtn) compressBtn.classList.remove('hidden');
+}
+
+// Show current avatar in edit mode
+function showCurrentAvatar(avatarUrl) {
+    const currentAvatarDisplay = document.getElementById('current-avatar-display');
+    const currentAvatarImage = document.getElementById('current-avatar-image');
+    const currentAvatarUrlText = document.getElementById('current-avatar-url');
+    
+    if (!currentAvatarDisplay || !currentAvatarImage || !currentAvatarUrlText) return;
+    
+    if (avatarUrl) {
+        currentAvatarImage.src = avatarUrl;
+        currentAvatarUrlText.textContent = avatarUrl;
+        currentAvatarDisplay.classList.remove('hidden');
+        currentAvatarUrl = avatarUrl;
+    } else {
+        currentAvatarDisplay.classList.add('hidden');
+        currentAvatarUrl = null;
+    }
+}
+
+// Upload progress display
+function showUploadProgress() {
+    const progressSection = document.getElementById('upload-progress');
+    const progressBar = document.getElementById('upload-progress-bar');
+    const statusText = document.getElementById('upload-status');
+    
+    if (!progressSection || !progressBar || !statusText) return null;
+    
+    progressSection.classList.remove('hidden');
+    progressBar.style.width = '0%';
+    statusText.textContent = 'Đang chuẩn bị tải lên...';
+    
+    // Simulate progress (since GitHub API doesn't provide real progress)
+    let progress = 0;
+    const interval = setInterval(() => {
+        progress += Math.random() * 30;
+        if (progress > 90) progress = 90;
         
-        showNotification('Cài đặt đã được lưu', 'success');
-    } catch (error) {
-        console.error('Error saving settings:', error);
-        showNotification('Lỗi khi lưu cài đặt', 'error');
+        progressBar.style.width = progress + '%';
+        statusText.textContent = `Đang tải lên... ${Math.round(progress)}%`;
+        
+        if (progress >= 90) {
+            clearInterval(interval);
+        }
+    }, 200);
+    
+    return interval;
+}
+
+function hideUploadProgress() {
+    const progressSection = document.getElementById('upload-progress');
+    if (progressSection) {
+        progressSection.classList.add('hidden');
+    }
+}
+
+// Updated initialization
+function setupEventListeners() {
+    // Login form
+    const loginForm = document.getElementById('login-form-element');
+    if (loginForm) {
+        loginForm.addEventListener('submit', handleLogin);
+    }
+
+    // Logout button
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', handleLogout);
+    }
+
+    // Tab navigation
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const targetTab = e.target.getAttribute('data-tab');
+            switchTab(targetTab);
+        });
+    });
+
+    // Member management
+    const addMemberBtn = document.getElementById('add-member-btn');
+    if (addMemberBtn) {
+        addMemberBtn.addEventListener('click', () => showMemberModal());
+    }
+
+    const cancelMemberBtn = document.getElementById('cancel-member-btn');
+    if (cancelMemberBtn) {
+        cancelMemberBtn.addEventListener('click', hideMemberModal);
+    }
+
+    const memberForm = document.getElementById('member-form');
+    if (memberForm) {
+        memberForm.addEventListener('submit', handleMemberSubmit);
     }
 }
