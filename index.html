@@ -302,22 +302,6 @@
                             <input type="tel" id="phone" class="bg-gray-800 border border-gray-700 text-white text-sm rounded-lg focus:ring-sky-500 focus:border-sky-500 block w-full p-2.5">
                         </div>
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6 text-center">
-                        <div>
-                            <label for="cv-upload" class="file-input-label">
-                                <i data-lucide="upload" class="inline-block mr-2"></i> Tải lên CV *
-                            </label>
-                            <input type="file" id="cv-upload" class="file-input" required accept=".pdf,.doc,.docx">
-                            <p id="cv-filename" class="text-sm text-gray-500 mt-2">Chưa chọn tệp</p>
-                        </div>
-                        <div>
-                            <label for="transcript-upload" class="file-input-label">
-                                <i data-lucide="upload" class="inline-block mr-2"></i> Tải lên Bảng điểm *
-                            </label>
-                            <input type="file" id="transcript-upload" class="file-input" required accept=".pdf">
-                            <p id="transcript-filename" class="text-sm text-gray-500 mt-2">Chưa chọn tệp</p>
-                        </div>
-                    </div>
                     <div class="mb-6">
                          <label for="message" class="block mb-2 text-sm font-medium text-gray-300">Thư ngỏ / Lời nhắn</label>
                          <textarea id="message" rows="4" class="bg-gray-800 border border-gray-700 text-white text-sm rounded-lg focus:ring-sky-500 focus:border-sky-500 block w-full p-2.5"></textarea>
@@ -488,23 +472,6 @@
                     }
                 });
             });
-            
-            // --- Xử lý tên file khi upload ---
-            function setupFileInput(inputId, filenameId) {
-                const input = document.getElementById(inputId);
-                const filenameDisplay = document.getElementById(filenameId);
-                if (input && filenameDisplay) {
-                    input.addEventListener('change', () => {
-                        if (input.files.length > 0) {
-                            filenameDisplay.textContent = input.files[0].name;
-                        } else {
-                            filenameDisplay.textContent = 'Chưa chọn tệp';
-                        }
-                    });
-                }
-            }
-            setupFileInput('cv-upload', 'cv-filename');
-            setupFileInput('transcript-upload', 'transcript-filename');
             
             // --- Xử lý Smooth Scroll cho các link menu ---
             document.querySelectorAll('a[href^="#"]').forEach(anchor => {

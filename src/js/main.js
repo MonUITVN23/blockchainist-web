@@ -474,19 +474,118 @@ function setupContactForm() {
     
     if (contactForm) {
         contactForm.addEventListener('submit', handleContactSubmit);
+        
+        // Add real-time validation
+        setupFormValidation(contactForm);
     }
-    
-    // Setup file inputs
-    setupFileInput('cv-upload', 'cv-filename');
-    setupFileInput('transcript-upload', 'transcript-filename');
 }
 
-// Handle contact form submission (simplified without file storage)
+// Setup form validation
+function setupFormValidation(form) {
+    const nameInput = form.querySelector('#name');
+    const emailInput = form.querySelector('#email');
+    const phoneInput = form.querySelector('#phone');
+    
+    // Name validation
+    if (nameInput) {
+        nameInput.addEventListener('blur', function() {
+            validateName(this);
+        });
+    }
+    
+    // Email validation  
+    if (emailInput) {
+        emailInput.addEventListener('blur', function() {
+            validateEmail(this);
+        });
+    }
+    
+    // Phone validation
+    if (phoneInput) {
+        phoneInput.addEventListener('blur', function() {
+            validatePhone(this);
+        });
+    }
+}
+
+// Validation functions
+function validateName(input) {
+    const value = input.value.trim();
+    if (value.length < 2) {
+        showFieldError(input, 'Tên phải có ít nhất 2 ký tự');
+        return false;
+    }
+    clearFieldError(input);
+    return true;
+}
+
+function validateEmail(input) {
+    const value = input.value.trim();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(value)) {
+        showFieldError(input, 'Email không hợp lệ');
+        return false;
+    }
+    clearFieldError(input);
+    return true;
+}
+
+function validatePhone(input) {
+    const value = input.value.trim();
+    if (value && !/^[\d\s\-\+\(\)]+$/.test(value)) {
+        showFieldError(input, 'Số điện thoại không hợp lệ');
+        return false;
+    }
+    clearFieldError(input);
+    return true;
+}
+
+function showFieldError(input, message) {
+    // Remove existing error
+    clearFieldError(input);
+    
+    // Add error styling
+    input.classList.add('border-red-500');
+    input.classList.remove('border-gray-700');
+    
+    // Create error message
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'field-error text-red-400 text-xs mt-1';
+    errorDiv.textContent = message;
+    
+    // Insert after input
+    input.parentNode.insertBefore(errorDiv, input.nextSibling);
+}
+
+function clearFieldError(input) {
+    // Remove error styling
+    input.classList.remove('border-red-500');
+    input.classList.add('border-gray-700');
+    
+    // Remove error message
+    const errorDiv = input.parentNode.querySelector('.field-error');
+    if (errorDiv) {
+        errorDiv.remove();
+    }
+}
+
+// Handle contact form submission
 async function handleContactSubmit(e) {
     e.preventDefault();
     
-    const submitButton = e.target.querySelector('button[type="submit"]');
+    const form = e.target;
+    const submitButton = form.querySelector('button[type="submit"]');
     const originalText = submitButton.textContent;
+    
+    // Validate form before submission
+    const nameValid = validateName(form.querySelector('#name'));
+    const emailValid = validateEmail(form.querySelector('#email'));
+    const phoneValid = validatePhone(form.querySelector('#phone'));
+    
+    if (!nameValid || !emailValid || !phoneValid) {
+        showNotification('Vui lòng kiểm tra lại thông tin đã nhập', 'error');
+        return;
+    }
     
     // Show loading state
     submitButton.disabled = true;
@@ -495,81 +594,48 @@ async function handleContactSubmit(e) {
     try {
         // Get form data
         const formData = {
-            name: document.getElementById('name').value,
-            email: document.getElementById('email').value,
-            school: document.getElementById('school').value,
-            phone: document.getElementById('phone').value,
-            message: document.getElementById('message').value,
+            name: document.getElementById('name').value.trim(),
+            email: document.getElementById('email').value.trim(),
+            school: document.getElementById('school').value.trim(),
+            phone: document.getElementById('phone').value.trim(),
+            message: document.getElementById('message').value.trim(),
             timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            status: 'pending'
+            status: 'pending',
+            source: 'website_contact_form'
         };
         
-        // Handle file information (store metadata only)
-        const cvFile = document.getElementById('cv-upload').files[0];
-        const transcriptFile = document.getElementById('transcript-upload').files[0];
+        // Save to Firestore
+        const docRef = await db.collection('applications').add(formData);
         
-        if (cvFile) {
-            formData.cvInfo = {
-                name: cvFile.name,
-                size: cvFile.size,
-                type: cvFile.type,
-                hasFile: true
-            };
-        }
+        console.log('Application submitted with ID:', docRef.id);
         
-        if (transcriptFile) {
-            formData.transcriptInfo = {
-                name: transcriptFile.name,
-                size: transcriptFile.size,
-                type: transcriptFile.type,
-                hasFile: true
-            };
-        }
+        // Show success message
+        showNotification('🎉 Thông tin của bạn đã được gửi thành công! Chúng tôi sẽ liên hệ với bạn trong vòng 24-48h. Hãy kiểm tra email (kể cả thư mục spam) để nhận phản hồi từ chúng tôi.', 'success');
         
-        // Save to Firestore (without actual files)
-        await db.collection('applications').add(formData);
-        
-        // Show success message with instructions
-        let message = 'Thông tin của bạn đã được gửi thành công! ';
-        if (cvFile || transcriptFile) {
-            message += 'Vui lòng gửi CV và bảng điểm qua email: admin@blockchainist.edu.vn với tiêu đề "Hồ sơ ứng tuyển - ' + formData.name + '"';
-        }
-        showNotification(message, 'success');
-        
-        // Reset form
-        e.target.reset();
-        document.getElementById('cv-filename').textContent = 'Chưa chọn tệp';
-        document.getElementById('transcript-filename').textContent = 'Chưa chọn tệp';
+        // Reset form and clear any errors
+        form.reset();
+        form.querySelectorAll('.field-error').forEach(error => error.remove());
+        form.querySelectorAll('input').forEach(input => {
+            input.classList.remove('border-red-500');
+            input.classList.add('border-gray-700');
+        });
         
     } catch (error) {
         console.error('Error submitting application:', error);
-        showNotification('Có lỗi xảy ra khi gửi hồ sơ. Vui lòng thử lại sau.', 'error');
+        let errorMessage = 'Có lỗi xảy ra khi gửi hồ sơ. Vui lòng thử lại sau.';
+        
+        // Handle specific error cases
+        if (error.code === 'permission-denied') {
+            errorMessage = 'Lỗi quyền truy cập. Vui lòng thử lại sau.';
+        } else if (error.code === 'unavailable') {
+            errorMessage = 'Không thể kết nối đến server. Vui lòng kiểm tra kết nối internet.';
+        }
+        
+        showNotification(errorMessage, 'error');
     } finally {
         // Reset button
         submitButton.disabled = false;
         submitButton.textContent = originalText;
-    }
-}
-
-// Setup file input display
-function setupFileInput(inputId, filenameId) {
-    const input = document.getElementById(inputId);
-    const filenameDisplay = document.getElementById(filenameId);
-    
-    if (input && filenameDisplay) {
-        input.addEventListener('change', () => {
-            if (input.files.length > 0) {
-                const fileName = input.files[0].name;
-                const fileSize = (input.files[0].size / 1024 / 1024).toFixed(2);
-                filenameDisplay.textContent = `${fileName} (${fileSize} MB)`;
-                filenameDisplay.classList.remove('text-gray-500');
-                filenameDisplay.classList.add('text-green-400');
-            } else {
-                filenameDisplay.textContent = 'Chưa chọn tệp';
-                filenameDisplay.classList.remove('text-green-400');
-                filenameDisplay.classList.add('text-gray-500');
-            }
-        });
     }
 }
 
@@ -609,8 +675,8 @@ function showNotification(message, type = 'info') {
     notification.classList.add(bgColor);
     
     notification.innerHTML = `
-        <div class="flex items-center">
-            <div class="flex-shrink-0">
+        <div class="flex items-start">
+            <div class="flex-shrink-0 mt-1">
                 ${type === 'success' ? 
                     '<i data-lucide="check-circle" class="w-5 h-5 text-white"></i>' :
                     type === 'error' ?
@@ -619,9 +685,9 @@ function showNotification(message, type = 'info') {
                 }
             </div>
             <div class="ml-3 flex-1">
-                <p class="text-sm font-medium text-white">${message}</p>
+                <p class="text-sm font-medium text-white leading-relaxed">${message}</p>
             </div>
-            <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-white hover:text-gray-200">
+            <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-white hover:text-gray-200 flex-shrink-0 mt-1">
                 <i data-lucide="x" class="w-4 h-4"></i>
             </button>
         </div>
@@ -639,7 +705,8 @@ function showNotification(message, type = 'info') {
         notification.classList.remove('translate-x-full');
     }, 100);
     
-    // Auto remove after 5 seconds
+    // Auto remove after longer time for success messages
+    const autoRemoveTime = type === 'success' ? 8000 : 5000;
     setTimeout(() => {
         if (notification.parentElement) {
             notification.classList.add('translate-x-full');
@@ -649,7 +716,7 @@ function showNotification(message, type = 'info') {
                 }
             }, 300);
         }
-    }, 5000);
+    }, autoRemoveTime);
 }
 
 // Utility function to format date

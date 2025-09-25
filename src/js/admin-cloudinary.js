@@ -169,6 +169,8 @@ async function loadApplications() {
         snapshot.forEach(doc => {
             const data = doc.data();
             const date = data.timestamp ? data.timestamp.toDate().toLocaleDateString('vi-VN') : 'Không rõ';
+            const time = data.timestamp ? data.timestamp.toDate().toLocaleTimeString('vi-VN') : '';
+            const source = data.source || 'website';
             
             html += `
                 <div class="bg-gray-700 p-6 rounded-lg border border-gray-600">
@@ -176,8 +178,14 @@ async function loadApplications() {
                         <div>
                             <h4 class="text-lg font-semibold text-white">${data.name || 'Không rõ'}</h4>
                             <p class="text-sky-400">${data.email || 'Không rõ'}</p>
+                            <span class="text-xs px-2 py-1 rounded-full bg-blue-600 text-white mt-1 inline-block">
+                                ${source === 'website_contact_form' ? '🌐 Website Form' : '📧 Other'}
+                            </span>
                         </div>
-                        <span class="text-sm text-gray-400">${date}</span>
+                        <div class="text-right">
+                            <span class="text-sm text-gray-400">${date}</span>
+                            ${time ? `<br><span class="text-xs text-gray-500">${time}</span>` : ''}
+                        </div>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div>
@@ -192,16 +200,28 @@ async function loadApplications() {
                     ${data.message ? `
                         <div class="mb-4">
                             <p class="text-sm text-gray-400">Thư ngỏ:</p>
-                            <p class="text-white">${data.message}</p>
+                            <div class="bg-gray-600 p-3 rounded-lg mt-1">
+                                <p class="text-white text-sm">${data.message}</p>
+                            </div>
                         </div>
                     ` : ''}
-                    <div class="flex space-x-2">
-                        <button onclick="deleteApplication('${doc.id}')" class="text-red-400 hover:text-red-300 text-sm">
-                            <i class="fas fa-trash mr-1"></i>Xóa
-                        </button>
-                        <button onclick="contactApplicant('${data.email}', '${data.name}')" class="text-blue-400 hover:text-blue-300 text-sm">
-                            <i class="fas fa-envelope mr-1"></i>Liên hệ
-                        </button>
+                    <div class="flex justify-between items-center">
+                        <div class="flex space-x-2">
+                            <button onclick="deleteApplication('${doc.id}')" class="text-red-400 hover:text-red-300 text-sm px-3 py-1 border border-red-400 rounded hover:bg-red-400 hover:text-white transition-colors">
+                                <i class="fas fa-trash mr-1"></i>Xóa
+                            </button>
+                            <button onclick="contactApplicant('${data.email}', '${data.name}')" class="text-blue-400 hover:text-blue-300 text-sm px-3 py-1 border border-blue-400 rounded hover:bg-blue-400 hover:text-white transition-colors">
+                                <i class="fas fa-envelope mr-1"></i>Liên hệ
+                            </button>
+                            ${data.status !== 'contacted' ? `
+                                <button onclick="markAsContacted('${doc.id}')" class="text-green-400 hover:text-green-300 text-sm px-3 py-1 border border-green-400 rounded hover:bg-green-400 hover:text-white transition-colors">
+                                    <i class="fas fa-check mr-1"></i>Đã liên hệ
+                                </button>
+                            ` : ''}
+                        </div>
+                        <span class="text-xs px-2 py-1 rounded ${data.status === 'pending' ? 'bg-yellow-600' : data.status === 'contacted' ? 'bg-green-600' : 'bg-gray-600'} text-white">
+                            ${data.status === 'pending' ? '⏳ Chưa xử lý' : data.status === 'contacted' ? '✅ Đã liên hệ' : '📝 ' + (data.status || 'pending')}
+                        </span>
                     </div>
                 </div>
             `;
@@ -233,6 +253,21 @@ function contactApplicant(email, name) {
     const subject = encodeURIComponent(`Phản hồi hồ sơ ứng tuyển - ${name}`);
     const body = encodeURIComponent(`Chào ${name},\n\nCảm ơn bạn đã quan tâm đến nhóm nghiên cứu.\n\nTrân trọng.`);
     window.open(`mailto:${email}?subject=${subject}&body=${body}`, '_blank');
+}
+
+// Mark application as contacted
+async function markAsContacted(id) {
+    try {
+        await db.collection('applications').doc(id).update({
+            status: 'contacted',
+            contactedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        loadApplications();
+        showNotification('Đã đánh dấu là đã liên hệ', 'success');
+    } catch (error) {
+        console.error('Error updating application status:', error);
+        showNotification('Lỗi khi cập nhật trạng thái', 'error');
+    }
 }
 
 // Members Management
