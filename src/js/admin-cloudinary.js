@@ -40,6 +40,7 @@ function initializeAdmin() {
             showDashboard();
             loadApplications();
             loadMembers();
+            loadPublications();
         } else {
             showLoginForm();
         }
@@ -82,6 +83,22 @@ function setupEventListeners() {
     const memberForm = document.getElementById('member-form');
     if (memberForm) {
         memberForm.addEventListener('submit', handleMemberSubmit);
+    }
+
+    // Publication management
+    const addPublicationBtn = document.getElementById('add-publication-btn');
+    if (addPublicationBtn) {
+        addPublicationBtn.addEventListener('click', () => showPublicationModal());
+    }
+
+    const cancelPublicationBtn = document.getElementById('cancel-publication-btn');
+    if (cancelPublicationBtn) {
+        cancelPublicationBtn.addEventListener('click', hidePublicationModal);
+    }
+
+    const publicationForm = document.getElementById('publication-form');
+    if (publicationForm) {
+        publicationForm.addEventListener('submit', handlePublicationSubmit);
     }
 }
 
@@ -671,6 +688,439 @@ async function handleMemberSubmit(e) {
         saveText.classList.remove('hidden');
         saveLoading.classList.add('hidden');
         hideUploadProgress();
+    }
+}
+
+// Publications Management
+async function loadPublications() {
+    const listDiv = document.getElementById('publications-list');
+    
+    try {
+        const snapshot = await db.collection('publications').orderBy('year', 'desc').get();
+        
+        if (snapshot.empty) {
+            listDiv.innerHTML = '<p class="text-gray-400 text-center py-8">Chưa có công bố khoa học nào</p>';
+            return;
+        }
+
+        let html = '';
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            const imageUrl = data.imageUrl || data.cloudinaryId ? 
+                (data.cloudinaryId ? getOptimizedUrl(data.cloudinaryId, 'publicationThumbnail') : data.imageUrl) :
+                'https://via.placeholder.com/400x200/374151/FFFFFF?text=No+Image';
+            
+            html += `
+                <div class="bg-gray-700 p-6 rounded-lg border border-gray-600">
+                    <div class="flex gap-4">
+                        <img src="${imageUrl}" alt="${data.title}" 
+                             class="w-32 h-20 rounded-lg object-cover flex-shrink-0"
+                             onerror="this.src='https://via.placeholder.com/400x200/374151/FFFFFF?text=No+Image'">
+                        <div class="flex-1">
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="text-xs px-2 py-1 rounded ${getPublicationTypeColor(data.type)} text-white">
+                                    ${data.type || 'Paper'}
+                                </span>
+                                <span class="text-sm text-gray-400">${data.year || 'N/A'}</span>
+                            </div>
+                            <h4 class="text-lg font-semibold text-white mb-2">${data.title}</h4>
+                            <p class="text-sky-400 text-sm mb-2">${data.authors}</p>
+                            <p class="text-gray-300 text-sm mb-3"><em>${data.journal}</em></p>
+                            <div class="flex justify-between items-center">
+                                <div class="flex space-x-4 text-sm text-gray-400">
+                                    ${data.citations ? `<span>${data.citations} citations</span>` : ''}
+                                    ${data.impactFactor ? `<span>IF: ${data.impactFactor}</span>` : ''}
+                                </div>
+                                <div class="flex space-x-2">
+                                    <button onclick="editPublication('${doc.id}')" class="text-sky-400 hover:text-sky-300 text-sm px-3 py-1 border border-sky-400 rounded hover:bg-sky-400 hover:text-white transition-colors">Sửa</button>
+                                    <button onclick="deletePublication('${doc.id}')" class="text-red-400 hover:text-red-300 text-sm px-3 py-1 border border-red-400 rounded hover:bg-red-400 hover:text-white transition-colors">Xóa</button>
+                                    ${data.url ? `<a href="${data.url}" target="_blank" class="text-green-400 hover:text-green-300 text-sm px-3 py-1 border border-green-400 rounded hover:bg-green-400 hover:text-white transition-colors">Xem</a>` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        listDiv.innerHTML = html;
+        
+    } catch (error) {
+        console.error('Error loading publications:', error);
+        listDiv.innerHTML = '<p class="text-red-400 text-center py-8">Lỗi khi tải dữ liệu</p>';
+    }
+}
+
+// Edit publication function
+async function editPublication(publicationId) {
+    try {
+        const doc = await db.collection('publications').doc(publicationId).get();
+        if (doc.exists) {
+            const data = doc.data();
+            showPublicationModal(true, publicationId, data);
+        }
+    } catch (error) {
+        console.error('Error fetching publication:', error);
+        showNotification('Lỗi khi tải thông tin công bố', 'error');
+    }
+}
+
+async function deletePublication(publicationId) {
+    if (!confirm('Bạn có chắc chắn muốn xóa công bố này?')) return;
+    
+    try {
+        await db.collection('publications').doc(publicationId).delete();
+        loadPublications();
+        showNotification('Đã xóa công bố thành công', 'success');
+    } catch (error) {
+        console.error('Error deleting publication:', error);
+        showNotification('Lỗi khi xóa công bố', 'error');
+    }
+}
+
+// Publication modal functions
+function showPublicationModal(editMode = false, publicationId = null, publicationData = {}) {
+    const modal = document.getElementById('publication-modal');
+    const title = document.getElementById('publication-modal-title');
+    const form = document.getElementById('publication-form');
+    
+    // Reset states
+    selectedPublicationImageFile = null;
+    currentPublicationImageUrl = publicationData.imageUrl || null;
+    currentPublicationImageCloudinaryId = publicationData.cloudinaryId || null;
+    
+    // Fill form
+    document.getElementById('publication-title').value = publicationData.title || '';
+    document.getElementById('publication-authors').value = publicationData.authors || '';
+    document.getElementById('publication-journal').value = publicationData.journal || '';
+    document.getElementById('publication-type').value = publicationData.type || '';
+    document.getElementById('publication-year').value = publicationData.year || new Date().getFullYear();
+    document.getElementById('publication-url').value = publicationData.url || '';
+    document.getElementById('publication-image-url').value = '';
+    document.getElementById('publication-abstract').value = publicationData.abstract || '';
+    document.getElementById('publication-doi').value = publicationData.doi || '';
+    document.getElementById('publication-citations').value = publicationData.citations || '';
+    document.getElementById('publication-impact-factor').value = publicationData.impactFactor || '';
+    
+    // Show current image
+    if (editMode && (publicationData.imageUrl || publicationData.cloudinaryId)) {
+        showCurrentPublicationImage(publicationData.imageUrl || (publicationData.cloudinaryId ? getOptimizedUrl(publicationData.cloudinaryId, 'publicationPreview') : null), publicationData.cloudinaryId);
+    } else {
+        hideCurrentPublicationImage();
+    }
+    
+    hidePublicationImagePreview();
+    
+    // Set modal state
+    title.textContent = editMode ? 'Sửa công bố khoa học' : 'Thêm công bố khoa học';
+    form.setAttribute('data-publication-id', publicationId || '');
+    form.setAttribute('data-edit-mode', editMode);
+    
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    
+    // Setup image upload
+    setupPublicationImageUpload();
+}
+
+function hidePublicationModal() {
+    const modal = document.getElementById('publication-modal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
+
+// Publication image upload variables
+let selectedPublicationImageFile = null;
+let currentPublicationImageUrl = null;
+let currentPublicationImageCloudinaryId = null;
+
+// Setup publication image upload
+function setupPublicationImageUpload() {
+    const fileInput = document.getElementById('publication-image-input');
+    const urlInput = document.getElementById('publication-image-url');
+    
+    if (!fileInput || fileInput.hasPublicationEventListener) return;
+    
+    fileInput.addEventListener('change', async function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            selectedPublicationImageFile = file;
+            showLocalPublicationImagePreview(file);
+            
+            try {
+                await uploadPublicationImageToCloudinary(file);
+                if (urlInput) urlInput.value = '';
+            } catch (error) {
+                showNotification(`Upload failed: ${error.message}`, 'error');
+            }
+        }
+    });
+    
+    if (urlInput) {
+        urlInput.addEventListener('input', function(e) {
+            const url = e.target.value.trim();
+            if (url) {
+                selectedPublicationImageFile = null;
+                currentPublicationImageCloudinaryId = null;
+                fileInput.value = '';
+                showPublicationImageUrlPreview(url);
+            } else {
+                hidePublicationImagePreview();
+            }
+        });
+    }
+    
+    const removeBtn = document.getElementById('remove-publication-image-btn');
+    if (removeBtn) {
+        removeBtn.addEventListener('click', function() {
+            selectedPublicationImageFile = null;
+            currentPublicationImageCloudinaryId = null;
+            currentPublicationImageUrl = null;
+            fileInput.value = '';
+            if (urlInput) urlInput.value = '';
+            hidePublicationImagePreview();
+        });
+    }
+    
+    fileInput.hasPublicationEventListener = true;
+}
+
+// Publication image upload functions
+async function uploadPublicationImageToCloudinary(file) {
+    const progressInterval = showPublicationUploadProgress();
+    
+    try {
+        const customName = generateUniqueFilename(file.name, 'publication');
+        const result = await uploadToCloudinary(file, 'publications', customName);
+        
+        currentPublicationImageUrl = result.avatarUrl; // Using same field name from cloudinary response
+        currentPublicationImageCloudinaryId = result.publicId;
+        
+        showCloudinaryPublicationImagePreview(result);
+        
+        clearInterval(progressInterval);
+        updatePublicationProgressBar(100, 'Upload successful!');
+        setTimeout(hidePublicationUploadProgress, 2000);
+        
+        showNotification('✅ Image uploaded to Cloudinary!', 'success');
+        
+        return result;
+        
+    } catch (error) {
+        clearInterval(progressInterval);
+        hidePublicationUploadProgress();
+        throw error;
+    }
+}
+
+function showLocalPublicationImagePreview(file) {
+    const previewSection = document.getElementById('publication-image-preview');
+    const previewImage = document.getElementById('publication-image-preview-img');
+    const fileInfo = document.getElementById('publication-image-info');
+    
+    if (!previewSection || !previewImage || !fileInfo) return;
+    
+    const objectUrl = URL.createObjectURL(file);
+    previewImage.src = objectUrl;
+    
+    const sizeInMB = (file.size / 1024 / 1024).toFixed(2);
+    fileInfo.textContent = `📄 ${file.name} (${sizeInMB} MB, ${file.type})`;
+    
+    previewSection.classList.remove('hidden');
+    previewImage.onload = () => URL.revokeObjectURL(objectUrl);
+}
+
+function showCloudinaryPublicationImagePreview(result) {
+    const previewImage = document.getElementById('publication-image-preview-img');
+    const fileInfo = document.getElementById('publication-image-info');
+    const cloudinaryInfo = document.getElementById('publication-image-cloudinary-info');
+    
+    if (previewImage && result.avatarUrl) {
+        previewImage.src = result.avatarUrl;
+    }
+    
+    if (fileInfo) {
+        const sizeInKB = (result.size / 1024).toFixed(1);
+        fileInfo.textContent = `☁️ ${result.format.toUpperCase()} ${result.width}x${result.height} (${sizeInKB} KB)`;
+    }
+    
+    if (cloudinaryInfo) {
+        cloudinaryInfo.innerHTML = `<strong>Cloudinary ID:</strong> ${result.publicId}`;
+        cloudinaryInfo.classList.remove('hidden');
+    }
+}
+
+function showPublicationImageUrlPreview(url) {
+    const previewSection = document.getElementById('publication-image-preview');
+    const previewImage = document.getElementById('publication-image-preview-img');
+    const fileInfo = document.getElementById('publication-image-info');
+    
+    if (!previewSection || !previewImage || !fileInfo) return;
+    
+    previewImage.src = url;
+    fileInfo.textContent = `🔗 External URL: ${url.length > 50 ? url.substring(0, 50) + '...' : url}`;
+    
+    currentPublicationImageUrl = url;
+    previewSection.classList.remove('hidden');
+}
+
+function showCurrentPublicationImage(imageUrl, cloudinaryId = null) {
+    const display = document.getElementById('current-publication-image-display');
+    const image = document.getElementById('current-publication-image');
+    const urlText = document.getElementById('current-publication-image-url');
+    
+    if (imageUrl && display && image && urlText) {
+        image.src = imageUrl;
+        urlText.textContent = imageUrl;
+        display.classList.remove('hidden');
+        
+        currentPublicationImageUrl = imageUrl;
+        currentPublicationImageCloudinaryId = cloudinaryId;
+    }
+}
+
+function hideCurrentPublicationImage() {
+    const display = document.getElementById('current-publication-image-display');
+    if (display) {
+        display.classList.add('hidden');
+    }
+}
+
+function hidePublicationImagePreview() {
+    const previewSection = document.getElementById('publication-image-preview');
+    if (previewSection) {
+        previewSection.classList.add('hidden');
+    }
+}
+
+function showPublicationUploadProgress() {
+    const progressSection = document.getElementById('publication-upload-progress');
+    const progressBar = document.getElementById('publication-upload-progress-bar');
+    const statusText = document.getElementById('publication-upload-status');
+    
+    if (progressSection) progressSection.classList.remove('hidden');
+    if (progressBar) progressBar.style.width = '0%';
+    if (statusText) statusText.textContent = 'Uploading to Cloudinary...';
+    
+    let progress = 0;
+    const interval = setInterval(() => {
+        progress += Math.random() * 20;
+        if (progress > 90) progress = 90;
+        
+        if (progressBar) progressBar.style.width = progress + '%';
+    }, 200);
+    
+    return interval;
+}
+
+function updatePublicationProgressBar(percentage, status) {
+    const progressBar = document.getElementById('publication-upload-progress-bar');
+    const statusText = document.getElementById('publication-upload-status');
+    
+    if (progressBar) progressBar.style.width = percentage + '%';
+    if (statusText) statusText.textContent = status;
+}
+
+function hidePublicationUploadProgress() {
+    const progressSection = document.getElementById('publication-upload-progress');
+    if (progressSection) {
+        progressSection.classList.add('hidden');
+    }
+}
+
+// Handle publication form submission
+async function handlePublicationSubmit(e) {
+    e.preventDefault();
+    
+    const saveButton = e.target.querySelector('button[type="submit"]');
+    const saveText = document.getElementById('save-publication-text');
+    const saveLoading = document.getElementById('save-publication-loading');
+    
+    saveButton.disabled = true;
+    saveText.classList.add('hidden');
+    saveLoading.classList.remove('hidden');
+    
+    try {
+        let imageUrl = currentPublicationImageUrl;
+        let cloudinaryId = currentPublicationImageCloudinaryId;
+        
+        // Handle new file upload
+        if (selectedPublicationImageFile && !currentPublicationImageCloudinaryId) {
+            const result = await uploadPublicationImageToCloudinary(selectedPublicationImageFile);
+            imageUrl = result.avatarUrl;
+            cloudinaryId = result.publicId;
+        } 
+        // Use external URL
+        else if (document.getElementById('publication-image-url')?.value?.trim()) {
+            imageUrl = document.getElementById('publication-image-url').value.trim();
+            cloudinaryId = null;
+        }
+        
+        const publicationData = {
+            title: document.getElementById('publication-title').value.trim(),
+            authors: document.getElementById('publication-authors').value.trim(),
+            journal: document.getElementById('publication-journal').value.trim(),
+            type: document.getElementById('publication-type').value,
+            year: parseInt(document.getElementById('publication-year').value) || new Date().getFullYear(),
+            url: document.getElementById('publication-url').value.trim(),
+            imageUrl: imageUrl,
+            cloudinaryId: cloudinaryId,
+            abstract: document.getElementById('publication-abstract').value.trim(),
+            doi: document.getElementById('publication-doi').value.trim(),
+            citations: parseInt(document.getElementById('publication-citations').value) || null,
+            impactFactor: document.getElementById('publication-impact-factor').value.trim(),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        
+        const form = e.target;
+        const publicationId = form.getAttribute('data-publication-id');
+        const editMode = form.getAttribute('data-edit-mode') === 'true';
+        
+        if (editMode && publicationId) {
+            await db.collection('publications').doc(publicationId).update(publicationData);
+        } else {
+            publicationData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+            await db.collection('publications').add(publicationData);
+        }
+        
+        hidePublicationModal();
+        loadPublications();
+        showNotification('✅ Publication saved successfully!', 'success');
+        
+    } catch (error) {
+        console.error('Error saving publication:', error);
+        showNotification(`❌ Error: ${error.message}`, 'error');
+    } finally {
+        saveButton.disabled = false;
+        saveText.classList.remove('hidden');
+        saveLoading.classList.add('hidden');
+        hidePublicationUploadProgress();
+    }
+}
+
+// Helper function to get publication type color (already exists in main.js, duplicate here for admin)
+function getPublicationTypeColor(type) {
+    switch (type) {
+        case 'Q1':
+            return 'bg-red-600';
+        case 'Q2':
+            return 'bg-orange-600';
+        case 'Q3':
+            return 'bg-yellow-600';
+        case 'Q4':
+            return 'bg-green-600';
+        case 'Conference A':
+            return 'bg-blue-600';
+        case 'Conference B':
+            return 'bg-indigo-600';
+        case 'Conference C':
+            return 'bg-purple-600';
+        case 'Book Chapter':
+            return 'bg-pink-600';
+        case 'Patent':
+            return 'bg-teal-600';
+        default:
+            return 'bg-gray-600';
     }
 }
 

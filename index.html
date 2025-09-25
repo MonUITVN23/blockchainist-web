@@ -99,6 +99,15 @@
         .file-input {
             display: none;
         }
+        
+        /* Logo styling */
+        .logo-img {
+            filter: brightness(1.1);
+            transition: transform 0.2s ease;
+        }
+        .logo-img:hover {
+            transform: scale(1.05);
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-300">
@@ -106,9 +115,8 @@
     <!-- Header / Navbar -->
     <header class="fixed top-0 left-0 w-full z-50 bg-gray-900/50 backdrop-blur-sm transition-all duration-300">
         <div class="container mx-auto px-6 py-4 flex justify-between items-center">
-            <a href="#home" class="text-2xl font-bold text-white flex items-center gap-2">
-                <i data-lucide="shield-check" class="text-sky-400"></i>
-                <span>N S B</span>
+            <a href="#home" class="text-2xl font-bold text-white flex items-center gap-3">
+                <img src="src/assets/icons/logo.png" alt="Logo" class="h-10 w-auto logo-img">
             </a>
             <nav class="hidden md:flex space-x-8">
                 <a href="#research" class="hover:text-sky-400 transition-colors">Nghiên cứu</a>
@@ -135,16 +143,30 @@
         <!-- 1. Hero Section -->
         <section id="home" class="relative min-h-screen flex items-center justify-center overflow-hidden">
             <div id="hero-animation"></div>
-            <div class="hero-content text-center px-4">
-                <h1 class="text-5xl md:text-7xl font-black text-white leading-tight mb-4" data-aos="fade-down">
-                    KIẾN TẠO TƯƠNG LAI SỐ
-                </h1>
-                <p class="text-xl md:text-2xl font-light text-gray-300 mb-8 max-w-3xl mx-auto" data-aos="fade-up" data-aos-delay="200">
-                    <span class="text-gradient font-medium">Phi tập trung - An toàn - Thông minh.</span> Chào mừng đến với nhóm nghiên cứu Blockchain, Mạng và Bảo mật.
-                </p>
-                <a href="#research" class="bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 px-8 rounded-full text-lg transition-all duration-300 transform hover:scale-105" data-aos="zoom-in" data-aos-delay="400">
-                    Khám Phá Ngay
-                </a>
+            <div class="container mx-auto px-6">
+                <div class="grid lg:grid-cols-2 gap-12 items-center min-h-screen py-20">
+                    <!-- Logo Section - Left -->
+                    <div class="flex justify-center lg:justify-end -mt-16" data-aos="fade-right">
+                        <img src="src/assets/icons/logo.png" alt="Logo" class="h-48 md:h-56 lg:h-64 w-auto object-contain logo-img">
+                    </div>
+                    
+                    <!-- Content Section - Right -->
+                    <div class="text-center" data-aos="fade-left">
+                        <h1 class="text-3xl md:text-4xl lg:text-5xl font-black text-white leading-tight mb-6 -mt-6">
+                            KIẾN TẠO TƯƠNG LAI SỐ
+                        </h1>
+                        <p class="text-lg md:text-xl lg:text-2xl font-light text-gray-300 mb-8 max-w-2xl mx-auto">
+                            <span class="text-gradient font-medium">Phi tập trung - An toàn - Thông minh.</span>
+                        </p>
+                    </div>
+                </div>
+                
+                <!-- CTA Button - Center Bottom -->
+                <div class="text-center -mt-60 pb-20" data-aos="zoom-in" data-aos-delay="600">
+                    <a href="#research" class="inline-block bg-sky-500 hover:bg-sky-600 text-white font-bold py-4 px-10 rounded-full text-lg transition-all duration-300 transform hover:scale-105">
+                        Khám Phá Ngay
+                    </a>
+                </div>
             </div>
         </section>
 
@@ -221,15 +243,30 @@
                     <h2 class="text-4xl font-bold text-white">Công Bố Khoa Học</h2>
                     <p class="text-lg text-gray-400 mt-2">Các công trình nghiên cứu tiêu biểu của nhóm.</p>
                 </div>
-                <div class="space-y-6">
+                <div id="publications-grid" class="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     <!-- Publications will be loaded dynamically from Firebase -->
-                    <div class="text-center py-8">
+                    <div class="text-center py-8 col-span-full">
                         <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-sky-400 mx-auto"></div>
                         <p class="text-gray-400 mt-2">Đang tải công bố...</p>
                     </div>
                 </div>
             </div>
         </section>
+
+        <!-- Publication Detail Modal -->
+        <div id="publication-modal" class="fixed inset-0 z-50 hidden bg-black bg-opacity-75 flex items-center justify-center p-4">
+            <div class="bg-gray-900 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                <div class="sticky top-0 bg-gray-900 border-b border-gray-700 p-4 flex justify-between items-center">
+                    <h3 class="text-xl font-bold text-white">Chi Tiết Bài Báo</h3>
+                    <button id="close-modal" class="text-gray-400 hover:text-white">
+                        <i data-lucide="x" class="w-6 h-6"></i>
+                    </button>
+                </div>
+                <div id="modal-content" class="p-6">
+                    <!-- Modal content will be populated dynamically -->
+                </div>
+            </div>
+        </div>
         
         <!-- 5. Join Us Section -->
         <section id="join" class="py-20">

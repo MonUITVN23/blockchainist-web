@@ -36,6 +36,7 @@ function initializeWebsite() {
     setupContactForm();
     setupSmoothScrolling();
     setupProfileModal();
+    setupPublicationModal();
 }
 
 // Load members from Firebase với click handler
@@ -358,12 +359,28 @@ function switchProfileTab(tabName) {
 // Helper function to get publication type color
 function getPublicationTypeColor(type) {
     switch (type) {
+        case 'Q1':
+            return 'bg-red-600';
+        case 'Q2':
+            return 'bg-orange-600';
+        case 'Q3':
+            return 'bg-yellow-600';
+        case 'Q4':
+            return 'bg-green-600';
+        case 'Conference A':
+            return 'bg-blue-600';
+        case 'Conference B':
+            return 'bg-indigo-600';
+        case 'Conference C':
+            return 'bg-purple-600';
+        case 'Book Chapter':
+            return 'bg-pink-600';
+        case 'Patent':
+            return 'bg-teal-600';
         case 'Journal Article':
             return 'bg-blue-600';
         case 'Conference Paper':
             return 'bg-green-600';
-        case 'Book Chapter':
-            return 'bg-purple-600';
         case 'Magazine Article':
             return 'bg-orange-600';
         default:
@@ -382,43 +399,60 @@ function createSlugFromName(name) {
 // Load publications from Firebase - Updated with error handling
 async function loadPublications() {
     try {
-        const snapshot = await db.collection('publications').orderBy('year', 'desc').limit(5).get();
-        const publicationsContainer = document.querySelector('#publications .space-y-6');
+        const snapshot = await db.collection('publications').orderBy('year', 'desc').get();
+        const publicationsContainer = document.querySelector('#publications-grid');
         
         if (publicationsContainer && !snapshot.empty) {
             let html = '';
             snapshot.forEach(doc => {
-                const pub = doc.data();
+                const pub = { id: doc.id, ...doc.data() };
+                
+                // Get image URL - prioritize Cloudinary, fallback to direct URL, then placeholder
+                let imageUrl;
+                if (pub.cloudinaryId) {
+                    imageUrl = getOptimizedUrl(pub.cloudinaryId, 'publicationCard');
+                } else if (pub.imageUrl) {
+                    imageUrl = pub.imageUrl;
+                } else {
+                    imageUrl = getPlaceholderUrl('publication', 300);
+                }
+                
                 html += `
-                    <div class="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700" data-aos="fade-up">
-                        <div class="flex justify-between items-start mb-2">
-                            <span class="text-xs px-2 py-1 rounded ${getPublicationTypeColor(pub.type)} text-white">
-                                ${pub.type || 'Paper'}
-                            </span>
-                            <span class="text-sm text-gray-400">${pub.year || 'N/A'}</span>
-                        </div>
-                        <h4 class="text-xl font-bold text-white mb-2">${pub.title || 'Tiêu đề không rõ'}</h4>
-                        <p class="text-sky-400 mb-2">${pub.authors || 'Tác giả không rõ'}</p>
-                        <p class="text-gray-400 text-sm mb-4"><em>${pub.journal || 'Tạp chí không rõ'}</em></p>
-                        ${pub.abstract ? `
-                            <button class="toggle-abstract text-sky-400 hover:text-sky-300 text-sm mb-2 focus:outline-none">
-                                Xem Abstract
-                            </button>
-                            <div class="abstract-content hidden">
-                                <p class="text-gray-300 text-sm p-4 bg-gray-700 rounded-lg">${pub.abstract}</p>
+                    <div class="bg-gray-800 rounded-lg shadow-lg border border-gray-700 overflow-hidden hover:border-sky-500 hover:scale-105 transition-all duration-300 cursor-pointer publication-card" 
+                         data-publication='${JSON.stringify(pub).replace(/'/g, '&apos;')}' data-aos="fade-up">
+                        <!-- Image Section -->
+                        <div class="relative">
+                            <img src="${imageUrl}" 
+                                 alt="${pub.title || 'Publication'}" 
+                                 class="w-full h-40 object-cover"
+                                 loading="lazy"
+                                 onerror="this.src='${getPlaceholderUrl('publication', 300)}'">
+                            <div class="absolute top-2 right-2">
+                                <span class="text-xs px-2 py-1 rounded ${getPublicationTypeColor(pub.type)} text-white font-medium">
+                                    ${pub.type || 'Paper'}
+                                </span>
                             </div>
-                        ` : ''}
-                        <div class="flex justify-between items-center mt-4">
-                            <div class="flex space-x-4 text-sm text-gray-400">
-                                ${pub.citations ? `<span><i data-lucide="quote" class="w-4 h-4 inline mr-1"></i>${pub.citations}</span>` : ''}
-                                ${pub.doi ? `<span>DOI: ${pub.doi}</span>` : ''}
-                            </div>
-                            ${pub.url ? `
-                                <a href="${pub.url}" target="_blank" class="text-sky-400 hover:text-sky-300 text-sm">
-                                    <i data-lucide="external-link" class="inline w-4 h-4 mr-1"></i>
-                                    Xem bài báo
-                                </a>
+                            ${pub.impactFactor ? `
+                                <div class="absolute bottom-2 left-2">
+                                    <span class="text-xs px-2 py-1 bg-yellow-600 text-white rounded">IF: ${pub.impactFactor}</span>
+                                </div>
                             ` : ''}
+                        </div>
+                        
+                        <!-- Content Section -->
+                        <div class="p-4">
+                            <h3 class="text-sm font-bold text-white mb-2 line-clamp-2 leading-tight">
+                                ${pub.title || 'Untitled'}
+                            </h3>
+                            
+                            <p class="text-xs text-gray-300 mb-2 line-clamp-1">
+                                ${pub.authors || 'Unknown authors'}
+                            </p>
+                            
+                            <div class="flex justify-between items-center text-xs text-gray-400">
+                                <span>${pub.year || 'N/A'}</span>
+                                ${pub.url ? `<i data-lucide="external-link" class="w-4 h-4 text-sky-400"></i>` : ''}
+                            </div>
                         </div>
                     </div>
                 `;
@@ -426,8 +460,8 @@ async function loadPublications() {
             
             publicationsContainer.innerHTML = html;
             
-            // Setup abstract toggles
-            setupAbstractToggles();
+            // Setup publication card click handlers
+            setupPublicationCardClickHandlers();
             
             // Re-initialize AOS and Lucide icons
             if (typeof AOS !== 'undefined') {
@@ -438,10 +472,10 @@ async function loadPublications() {
             }
         } else {
             // Handle empty state
-            const publicationsContainer = document.querySelector('#publications .space-y-6');
+            const publicationsContainer = document.querySelector('#publications-grid');
             if (publicationsContainer) {
                 publicationsContainer.innerHTML = `
-                    <div class="text-center py-8">
+                    <div class="text-center py-8 col-span-full">
                         <p class="text-gray-400">Chưa có công bố khoa học nào.</p>
                     </div>
                 `;
@@ -449,17 +483,17 @@ async function loadPublications() {
         }
     } catch (error) {
         console.error('Error loading publications:', error);
-        const publicationsContainer = document.querySelector('#publications .space-y-6');
+        const publicationsContainer = document.querySelector('#publications-grid');
         if (publicationsContainer) {
             if (error.code === 'permission-denied') {
                 publicationsContainer.innerHTML = `
-                    <div class="text-center py-8">
+                    <div class="text-center py-8 col-span-full">
                         <p class="text-red-400">❌ Không thể tải danh sách công bố. Đang cập nhật quyền truy cập...</p>
                     </div>
                 `;
             } else {
                 publicationsContainer.innerHTML = `
-                    <div class="text-center py-8">
+                    <div class="text-center py-8 col-span-full">
                         <p class="text-red-400">❌ Lỗi khi tải công bố: ${error.message}</p>
                     </div>
                 `;
@@ -468,6 +502,105 @@ async function loadPublications() {
     }
 }
 
+// Setup publication card click handlers
+function setupPublicationCardClickHandlers() {
+    document.querySelectorAll('.publication-card').forEach(card => {
+        card.addEventListener('click', function(e) {
+            const publicationData = this.getAttribute('data-publication');
+            if (publicationData) {
+                try {
+                    const pub = JSON.parse(publicationData);
+                    showPublicationModal(pub);
+                } catch (error) {
+                    console.error('Error parsing publication data:', error);
+                }
+            }
+        });
+    });
+}
+
+// Show publication modal with detailed information
+function showPublicationModal(pub) {
+    const modal = document.getElementById('publication-modal');
+    const modalContent = document.getElementById('modal-content');
+    
+    if (!modal || !modalContent) return;
+    
+    // Get image URL
+    let imageUrl;
+    if (pub.cloudinaryId) {
+        imageUrl = getOptimizedUrl(pub.cloudinaryId, 'publicationDetail');
+    } else if (pub.imageUrl) {
+        imageUrl = pub.imageUrl;
+    } else {
+        imageUrl = getPlaceholderUrl('publication', 600);
+    }
+    
+    modalContent.innerHTML = `
+        <div class="flex flex-col md:flex-row gap-6">
+            <!-- Image -->
+            <div class="md:w-1/3">
+                <img src="${imageUrl}" 
+                     alt="${pub.title || 'Publication'}" 
+                     class="w-full h-64 md:h-80 object-cover rounded-lg"
+                     onerror="this.src='${getPlaceholderUrl('publication', 600)}'">
+            </div>
+            
+            <!-- Content -->
+            <div class="md:w-2/3">
+                <div class="flex justify-between items-start mb-4">
+                    <span class="text-sm px-3 py-1 rounded ${getPublicationTypeColor(pub.type)} text-white font-medium">
+                        ${pub.type || 'Paper'}
+                    </span>
+                    <div class="text-right">
+                        <span class="text-gray-400">${pub.year || 'N/A'}</span>
+                        ${pub.impactFactor ? `<br><span class="text-yellow-400 text-sm">Impact Factor: ${pub.impactFactor}</span>` : ''}
+                    </div>
+                </div>
+                
+                <h3 class="text-2xl font-bold text-white mb-4">${pub.title || 'Untitled'}</h3>
+                
+                <div class="space-y-3 text-gray-300">
+                    <p><strong class="text-white">Tác giả:</strong> ${pub.authors || 'Unknown authors'}</p>
+                    
+                    ${pub.journal ? `<p><strong class="text-white">Tạp chí:</strong> <span class="text-sky-400">${pub.journal}</span></p>` : ''}
+                    
+                    ${pub.doi ? `<p><strong class="text-white">DOI:</strong> <code class="text-green-400 bg-gray-800 px-2 py-1 rounded text-sm">${pub.doi}</code></p>` : ''}
+                    
+                    ${pub.citations ? `<p><strong class="text-white">Trích dẫn:</strong> <span class="text-yellow-400">${pub.citations}</span></p>` : ''}
+                    
+                    ${pub.abstract ? `
+                        <div>
+                            <strong class="text-white">Abstract:</strong>
+                            <p class="mt-2 text-gray-300 text-sm leading-relaxed p-4 bg-gray-800 rounded-lg">${pub.abstract}</p>
+                        </div>
+                    ` : ''}
+                </div>
+                
+                ${pub.url ? `
+                    <div class="mt-6">
+                        <a href="${pub.url}" target="_blank" 
+                           class="inline-flex items-center px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-colors">
+                            <i data-lucide="external-link" class="w-4 h-4 mr-2"></i>
+                            Xem bài báo đầy đủ
+                        </a>
+                    </div>
+                ` : ''}
+            </div>
+        </div>
+    `;
+    
+    // Show modal
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+    
+    // Re-initialize Lucide icons
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+    }
+}
+
+// Setup abstract toggle functionality
 // Setup contact form
 function setupContactForm() {
     const contactForm = document.querySelector('#contact form');
@@ -751,7 +884,43 @@ function safeGetPlaceholderUrl(type, size) {
         return getPlaceholderUrl(type, size);
     }
     // Fallback placeholder
-    return `https://via.placeholder.com/${size}x${size}/374151/FFFFFF?text=${type === 'avatar' ? 'A' : 'IMG'}`;
+    const text = type === 'avatar' ? 'A' : type === 'publication' ? 'PUB' : 'IMG';
+    const dimensions = type === 'publication' ? '400x200' : `${size}x${size}`;
+    return `https://via.placeholder.com/${dimensions}/374151/FFFFFF?text=${text}`;
+}
+
+// Setup publication modal event listeners
+function setupPublicationModal() {
+    const modal = document.getElementById('publication-modal');
+    const closeButton = document.getElementById('close-modal');
+    
+    if (!modal || !closeButton) return;
+    
+    // Close modal when clicking close button
+    closeButton.addEventListener('click', closePublicationModal);
+    
+    // Close modal when clicking outside
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            closePublicationModal();
+        }
+    });
+    
+    // Close modal with Escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
+            closePublicationModal();
+        }
+    });
+}
+
+// Close publication modal
+function closePublicationModal() {
+    const modal = document.getElementById('publication-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+        document.body.style.overflow = '';
+    }
 }
 
 console.log('✅ Main.js with Cloudinary support loaded');
