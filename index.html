@@ -7,6 +7,18 @@
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/styles.css">
+
+    <!-- Firebase SDKs từ CDN -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js"></script>
+
+    <!-- File config -->
+    <script src="firebase-config.js"></script>
     
     <!-- Google Fonts: Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -204,26 +216,11 @@
                     <h2 class="text-4xl font-bold text-white">Công Bố Khoa Học</h2>
                     <p class="text-lg text-gray-400 mt-2">Các công trình nghiên cứu tiêu biểu của nhóm.</p>
                 </div>
-                <div class="space-y-8">
-                    <!-- Publication Item -->
-                    <div class="bg-gray-800 p-6 rounded-lg border border-gray-700" data-aos="fade-left">
-                        <h3 class="text-xl font-bold text-white">A Novel Consensus Algorithm for IoT-based Blockchain Networks</h3>
-                        <p class="text-gray-400 my-2 italic"><strong>Nguyễn Văn A</strong>, Trần Thị B, Lê Minh C.</p>
-                        <p class="text-sky-400">Proceedings of the IEEE International Conference on Communications (ICC), 2025.</p>
-                        <button class="toggle-abstract text-purple-400 font-semibold mt-3 hover:underline">Xem Abstract</button>
-                        <div class="abstract-content hidden mt-4 text-gray-400 border-t border-gray-700 pt-4">
-                            <p>This paper introduces a lightweight and energy-efficient consensus algorithm, Proof-of-Activity (PoA), specifically designed for resource-constrained IoT devices. Our proposed algorithm leverages device activity metrics to achieve consensus, significantly reducing computational overhead compared to traditional PoW and PoS systems. Experimental results demonstrate a 40% reduction in energy consumption while maintaining robust security and decentralization.</p>
-                        </div>
-                    </div>
-                     <!-- Publication Item -->
-                    <div class="bg-gray-800 p-6 rounded-lg border border-gray-700" data-aos="fade-left">
-                        <h3 class="text-xl font-bold text-white">Deep Learning-based Intrusion Detection for 5G-enabled Vehicular Networks</h3>
-                        <p class="text-gray-400 my-2 italic">Trần Thị B, <strong>Nguyễn Văn A</strong>.</p>
-                        <p class="text-sky-400">IEEE Transactions on Vehicular Technology, Vol. 74, No. 3, pp. 1120-1135, 2024.</p>
-                        <button class="toggle-abstract text-purple-400 font-semibold mt-3 hover:underline">Xem Abstract</button>
-                        <div class="abstract-content hidden mt-4 text-gray-400 border-t border-gray-700 pt-4">
-                           <p>As 5G technology enables new V2X (Vehicle-to-Everything) applications, security becomes a paramount concern. We propose a novel intrusion detection system (IDS) using a hybrid Convolutional-Recurrent Neural Network (CRNN) model. The model is trained on a realistic dataset of network traffic and can accurately detect various attacks, including DDoS and man-in-the-middle, with an F1-score of 98.7%.</p>
-                        </div>
+                <div class="space-y-6">
+                    <!-- Publications will be loaded dynamically from Firebase -->
+                    <div class="text-center py-8">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-sky-400 mx-auto"></div>
+                        <p class="text-gray-400 mt-2">Đang tải công bố...</p>
                     </div>
                 </div>
             </div>
@@ -340,6 +337,9 @@
     
     <!-- AOS - Animate on Scroll Library -->
     <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+
+    <!-- Main JavaScript -->
+    <script src="js/main.js"></script>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
