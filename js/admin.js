@@ -151,12 +151,17 @@ function switchTab(tabName) {
     }
 }
 
-// Applications Management
+// Applications Management - Updated with better error handling
 async function loadApplications() {
     const loadingDiv = document.getElementById('applications-loading');
     const listDiv = document.getElementById('applications-list');
     
     try {
+        // Check if user is authenticated
+        if (!currentUser) {
+            throw new Error('User not authenticated');
+        }
+        
         const snapshot = await db.collection('applications').orderBy('timestamp', 'desc').get();
         
         loadingDiv.classList.add('hidden');
@@ -223,7 +228,12 @@ async function loadApplications() {
     } catch (error) {
         console.error('Error loading applications:', error);
         loadingDiv.classList.add('hidden');
-        listDiv.innerHTML = '<p class="text-red-400 text-center py-8">Lỗi khi tải dữ liệu</p>';
+        
+        if (error.code === 'permission-denied') {
+            listDiv.innerHTML = '<p class="text-red-400 text-center py-8">❌ Không có quyền truy cập. Vui lòng đăng nhập.</p>';
+        } else {
+            listDiv.innerHTML = '<p class="text-red-400 text-center py-8">❌ Lỗi khi tải dữ liệu: ' + error.message + '</p>';
+        }
     }
 }
 
@@ -303,15 +313,25 @@ async function loadMembers() {
     }
 }
 
-function showMemberModal(editMode = false, memberId = null, name = '', role = '', avatar = '') {
+function showMemberModal(editMode = false, memberId = null, memberData = {}) {
     const modal = document.getElementById('member-modal');
     const title = document.getElementById('member-modal-title');
     const form = document.getElementById('member-form');
     
     // Set form values
-    document.getElementById('member-name').value = name;
-    document.getElementById('member-role').value = role;
-    document.getElementById('member-avatar').value = avatar;
+    document.getElementById('member-name').value = memberData.name || '';
+    document.getElementById('member-nickname').value = memberData.nickname || '';
+    document.getElementById('member-role').value = memberData.role || '';
+    document.getElementById('member-avatar').value = memberData.avatar || '';
+    document.getElementById('member-google-scholar').value = memberData.googleScholar || '';
+    document.getElementById('member-orcid').value = memberData.orcid || '';
+    document.getElementById('member-bio').value = memberData.bio || '';
+    document.getElementById('member-research-interests').value = 
+        (memberData.researchInterests || []).join('\n');
+    document.getElementById('member-education').value = 
+        (memberData.education || []).join('\n');
+    document.getElementById('member-achievements').value = 
+        (memberData.achievements || []).join('\n');
     
     // Set title and form action
     title.textContent = editMode ? 'Sửa thành viên' : 'Thêm thành viên';
@@ -332,16 +352,34 @@ async function handleMemberSubmit(e) {
     e.preventDefault();
     
     const name = document.getElementById('member-name').value;
+    const nickname = document.getElementById('member-nickname').value;
     const role = document.getElementById('member-role').value;
     const avatar = document.getElementById('member-avatar').value;
+    const googleScholar = document.getElementById('member-google-scholar').value;
+    const orcid = document.getElementById('member-orcid').value;
+    const bio = document.getElementById('member-bio').value;
+    const researchInterests = document.getElementById('member-research-interests').value
+        .split('\n').filter(item => item.trim()).map(item => item.trim());
+    const education = document.getElementById('member-education').value
+        .split('\n').filter(item => item.trim()).map(item => item.trim());
+    const achievements = document.getElementById('member-achievements').value
+        .split('\n').filter(item => item.trim()).map(item => item.trim());
+    
     const form = e.target;
     const memberId = form.getAttribute('data-member-id');
     const editMode = form.getAttribute('data-edit-mode') === 'true';
     
     const memberData = {
         name: name,
+        nickname: nickname,
         role: role,
-        avatar: avatar
+        avatar: avatar,
+        googleScholar: googleScholar,
+        orcid: orcid,
+        bio: bio,
+        researchInterests: researchInterests,
+        education: education,
+        achievements: achievements
     };
     
     try {
@@ -353,15 +391,25 @@ async function handleMemberSubmit(e) {
         
         hideMemberModal();
         loadMembers();
+        showNotification('Đã lưu thành viên thành công', 'success');
         
     } catch (error) {
         console.error('Error saving member:', error);
-        alert('Lỗi khi lưu thành viên');
+        showNotification('Lỗi khi lưu thành viên', 'error');
     }
 }
 
-function editMember(id, name, role, avatar) {
-    showMemberModal(true, id, name, role, avatar);
+async function editMember(id) {
+    try {
+        const doc = await db.collection('members').doc(id).get();
+        if (doc.exists) {
+            const memberData = doc.data();
+            showMemberModal(true, id, memberData);
+        }
+    } catch (error) {
+        console.error('Error loading member for edit:', error);
+        showNotification('Lỗi khi tải thông tin thành viên', 'error');
+    }
 }
 
 async function deleteMember(id) {
@@ -376,7 +424,7 @@ async function deleteMember(id) {
     }
 }
 
-// Publications Management
+// Publications Management - Updated with better error handling  
 async function loadPublications() {
     const listDiv = document.getElementById('publications-list');
     
@@ -410,7 +458,12 @@ async function loadPublications() {
         
     } catch (error) {
         console.error('Error loading publications:', error);
-        listDiv.innerHTML = '<p class="text-red-400 text-center py-8">Lỗi khi tải dữ liệu</p>';
+        
+        if (error.code === 'permission-denied') {
+            listDiv.innerHTML = '<p class="text-red-400 text-center py-8">❌ Không có quyền truy cập publications</p>';
+        } else {
+            listDiv.innerHTML = '<p class="text-red-400 text-center py-8">❌ Lỗi khi tải dữ liệu publications</p>';
+        }
     }
 }
 
@@ -426,9 +479,15 @@ async function deletePublication(id) {
     }
 }
 
-// Settings Management
+// Settings Management - Updated with better error handling
 async function loadSettings() {
     try {
+        // Check if user is authenticated
+        if (!currentUser) {
+            console.warn('User not authenticated, skipping settings load');
+            return;
+        }
+        
         const doc = await db.collection('settings').doc('general').get();
         if (doc.exists) {
             const data = doc.data();
@@ -439,6 +498,9 @@ async function loadSettings() {
         }
     } catch (error) {
         console.error('Error loading settings:', error);
+        if (error.code === 'permission-denied') {
+            showNotification('Không có quyền truy cập settings', 'error');
+        }
     }
 }
 

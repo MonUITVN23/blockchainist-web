@@ -29,9 +29,10 @@ function initializeWebsite() {
     loadPublications();
     setupContactForm();
     setupSmoothScrolling();
+    setupProfileModal();
 }
 
-// Load members from Firebase
+// Load members from Firebase với click handler
 async function loadMembers() {
     try {
         const snapshot = await db.collection('members').orderBy('name').get();
@@ -41,19 +42,30 @@ async function loadMembers() {
             let html = '';
             snapshot.forEach(doc => {
                 const member = doc.data();
+                const memberId = doc.id;
                 html += `
-                    <div class="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 text-center" data-aos="fade-up">
+                    <div class="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 text-center hover:border-sky-500 transition-colors cursor-pointer member-card" 
+                         data-member-id="${memberId}" data-aos="fade-up">
                         <div class="w-24 h-24 mx-auto mb-4 rounded-full overflow-hidden bg-gray-700">
                             <img src="${member.avatar || 'https://via.placeholder.com/96x96/4B5563/FFFFFF?text=' + (member.name?.charAt(0) || '?')}" 
                                  alt="${member.name || 'Thành viên'}" 
                                  class="w-full h-full object-cover">
                         </div>
                         <h4 class="text-lg font-bold text-white mb-2">${member.name || 'Không rõ tên'}</h4>
-                        <p class="text-sky-400">${member.role || 'Thành viên'}</p>
+                        <p class="text-sky-400 mb-2">${member.role || 'Thành viên'}</p>
+                        <p class="text-xs text-gray-400 hover:text-sky-300 transition-colors">Click để xem profile →</p>
                     </div>
                 `;
             });
             teamContainer.innerHTML = html;
+            
+            // Add click handlers to member cards
+            document.querySelectorAll('.member-card').forEach(card => {
+                card.addEventListener('click', (e) => {
+                    const memberId = e.currentTarget.getAttribute('data-member-id');
+                    showMemberProfile(memberId);
+                });
+            });
             
             // Re-initialize AOS for new elements
             if (typeof AOS !== 'undefined') {
@@ -65,7 +77,275 @@ async function loadMembers() {
     }
 }
 
-// Load publications from Firebase
+// Setup profile modal
+function setupProfileModal() {
+    const modal = document.getElementById('member-profile-modal');
+    const closeBtn = document.getElementById('close-profile-modal');
+    
+    // Close modal handlers
+    closeBtn?.addEventListener('click', hideProfileModal);
+    modal?.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            hideProfileModal();
+        }
+    });
+    
+    // Escape key handler
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
+            hideProfileModal();
+        }
+    });
+    
+    // Setup profile tabs
+    document.querySelectorAll('.profile-tab-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const targetTab = e.target.getAttribute('data-tab');
+            switchProfileTab(targetTab);
+        });
+    });
+}
+
+// Show member profile modal
+async function showMemberProfile(memberId) {
+    const modal = document.getElementById('member-profile-modal');
+    const loadingDiv = document.getElementById('profile-loading');
+    const contentDiv = document.getElementById('profile-content');
+    
+    // Show modal and loading state
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    loadingDiv.classList.remove('hidden');
+    contentDiv.classList.add('hidden');
+    
+    try {
+        // Load member data
+        const memberDoc = await db.collection('members').doc(memberId).get();
+        if (!memberDoc.exists) {
+            throw new Error('Member not found');
+        }
+        
+        const memberData = memberDoc.data();
+        
+        // Load member's publications
+        const publicationsSnapshot = await db.collection('publications')
+            .where('authorIds', 'array-contains', createSlugFromName(memberData.nickname || memberData.name))
+            .orderBy('year', 'desc')
+            .get();
+        
+        const publications = publicationsSnapshot.docs.map(doc => doc.data());
+        
+        // Populate profile data
+        populateProfileModal(memberData, publications);
+        
+        // Show content, hide loading
+        loadingDiv.classList.add('hidden');
+        contentDiv.classList.remove('hidden');
+        
+        // Initialize Lucide icons
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+        
+    } catch (error) {
+        console.error('Error loading member profile:', error);
+        showNotification('Lỗi khi tải thông tin thành viên', 'error');
+        hideProfileModal();
+    }
+}
+
+// Hide profile modal
+function hideProfileModal() {
+    const modal = document.getElementById('member-profile-modal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    
+    // Reset to first tab
+    switchProfileTab('research');
+}
+
+// Populate profile modal with member data
+function populateProfileModal(memberData, publications) {
+    // Basic info
+    document.getElementById('profile-avatar').src = memberData.avatar || '/default-avatar.png';
+    document.getElementById('profile-avatar').alt = memberData.name || 'Thành viên';
+    document.getElementById('profile-name').textContent = memberData.name || 'Không rõ tên';
+    document.getElementById('profile-nickname').textContent = memberData.nickname || '';
+    document.getElementById('profile-role').textContent = memberData.role || 'Thành viên';
+    document.getElementById('profile-bio').textContent = memberData.bio || 'Chưa có thông tin tiểu sử.';
+    
+    // Links
+    const googleScholarLink = document.getElementById('profile-google-scholar');
+    const orcidLink = document.getElementById('profile-orcid');
+    
+    if (memberData.googleScholar) {
+        googleScholarLink.href = memberData.googleScholar;
+        googleScholarLink.style.display = 'inline-block';
+    } else {
+        googleScholarLink.style.display = 'none';
+    }
+    
+    if (memberData.orcid) {
+        orcidLink.href = memberData.orcid;
+        orcidLink.style.display = 'inline-block';
+    } else {
+        orcidLink.style.display = 'none';
+    }
+    
+    // Research interests
+    const researchContainer = document.getElementById('profile-research-interests');
+    if (memberData.researchInterests && memberData.researchInterests.length > 0) {
+        researchContainer.innerHTML = memberData.researchInterests.map(interest => 
+            `<span class="bg-sky-600 text-white px-3 py-1 rounded-full text-sm">${interest}</span>`
+        ).join('');
+    } else {
+        researchContainer.innerHTML = '<p class="text-gray-400">Chưa có thông tin hướng nghiên cứu.</p>';
+    }
+    
+    // Publications
+    const publicationsContainer = document.getElementById('profile-publications-list');
+    const publicationsCount = document.getElementById('profile-publications-count');
+    
+    if (publications.length > 0) {
+        publicationsCount.textContent = `${publications.length} công bố`;
+        publicationsContainer.innerHTML = publications.map(pub => `
+            <div class="bg-gray-700 p-4 rounded-lg border border-gray-600">
+                <div class="flex justify-between items-start mb-2">
+                    <span class="text-xs px-2 py-1 rounded ${getPublicationTypeColor(pub.type)} text-white">
+                        ${pub.type || 'Paper'}
+                    </span>
+                    <div class="flex items-center text-sm text-gray-400">
+                        <i data-lucide="calendar" class="w-4 h-4 mr-1"></i>
+                        ${pub.year || 'N/A'}
+                    </div>
+                </div>
+                <h5 class="text-lg font-semibold text-white mb-2">${pub.title}</h5>
+                <p class="text-sky-400 text-sm mb-2">${pub.authors}</p>
+                <p class="text-gray-300 text-sm mb-3"><em>${pub.journal}</em></p>
+                ${pub.abstract ? `
+                    <div class="mb-3">
+                        <button class="toggle-abstract text-sky-400 hover:text-sky-300 text-sm">Xem Abstract</button>
+                        <div class="abstract-content hidden mt-2">
+                            <p class="text-gray-400 text-sm p-3 bg-gray-800 rounded-lg">${pub.abstract}</p>
+                        </div>
+                    </div>
+                ` : ''}
+                <div class="flex justify-between items-center">
+                    <div class="flex space-x-4 text-sm text-gray-400">
+                        ${pub.citations ? `<span><i data-lucide="quote" class="w-4 h-4 inline mr-1"></i>${pub.citations} citations</span>` : ''}
+                        ${pub.doi ? `<span>DOI: ${pub.doi}</span>` : ''}
+                    </div>
+                    ${pub.url ? `
+                        <a href="${pub.url}" target="_blank" class="text-sky-400 hover:text-sky-300 text-sm">
+                            <i data-lucide="external-link" class="w-4 h-4 inline mr-1"></i>Xem bài báo
+                        </a>
+                    ` : ''}
+                </div>
+            </div>
+        `).join('');
+        
+        // Setup abstract toggles
+        setTimeout(() => {
+            publicationsContainer.querySelectorAll('.toggle-abstract').forEach(button => {
+                button.addEventListener('click', () => {
+                    const content = button.nextElementSibling;
+                    const isHidden = content.classList.contains('hidden');
+                    
+                    if (isHidden) {
+                        content.classList.remove('hidden');
+                        button.textContent = 'Ẩn Abstract';
+                    } else {
+                        content.classList.add('hidden');
+                        button.textContent = 'Xem Abstract';
+                    }
+                });
+            });
+        }, 100);
+        
+    } else {
+        publicationsCount.textContent = '0 công bố';
+        publicationsContainer.innerHTML = '<p class="text-gray-400 text-center py-8">Chưa có công bố khoa học.</p>';
+    }
+    
+    // Education
+    const educationContainer = document.getElementById('profile-education');
+    if (memberData.education && memberData.education.length > 0) {
+        educationContainer.innerHTML = memberData.education.map(edu => `
+            <div class="flex items-start">
+                <i data-lucide="graduation-cap" class="w-5 h-5 text-sky-400 mr-3 mt-1 flex-shrink-0"></i>
+                <p class="text-gray-300">${edu}</p>
+            </div>
+        `).join('');
+    } else {
+        educationContainer.innerHTML = '<p class="text-gray-400">Chưa có thông tin học vấn.</p>';
+    }
+    
+    // Achievements
+    const achievementsContainer = document.getElementById('profile-achievements');
+    if (memberData.achievements && memberData.achievements.length > 0) {
+        achievementsContainer.innerHTML = memberData.achievements.map(achievement => `
+            <div class="flex items-start">
+                <i data-lucide="award" class="w-5 h-5 text-yellow-400 mr-3 mt-1 flex-shrink-0"></i>
+                <p class="text-gray-300">${achievement}</p>
+            </div>
+        `).join('');
+    } else {
+        achievementsContainer.innerHTML = '<p class="text-gray-400">Chưa có thông tin thành tích.</p>';
+    }
+}
+
+// Switch profile tabs
+function switchProfileTab(tabName) {
+    // Hide all tab contents
+    document.querySelectorAll('.profile-tab-content').forEach(tab => {
+        tab.classList.add('hidden');
+    });
+    
+    // Remove active class from all tab buttons
+    document.querySelectorAll('.profile-tab-btn').forEach(btn => {
+        btn.classList.remove('active', 'border-sky-500', 'text-sky-400');
+        btn.classList.add('border-transparent', 'text-gray-300');
+    });
+    
+    // Show target tab content
+    const targetTab = document.getElementById(`profile-tab-${tabName}`);
+    if (targetTab) {
+        targetTab.classList.remove('hidden');
+    }
+    
+    // Add active class to clicked tab button
+    const activeBtn = document.querySelector(`[data-tab="${tabName}"]`);
+    if (activeBtn) {
+        activeBtn.classList.add('active', 'border-sky-500', 'text-sky-400');
+        activeBtn.classList.remove('border-transparent', 'text-gray-300');
+    }
+}
+
+// Helper function to get publication type color
+function getPublicationTypeColor(type) {
+    switch (type) {
+        case 'Journal Article':
+            return 'bg-blue-600';
+        case 'Conference Paper':
+            return 'bg-green-600';
+        case 'Book Chapter':
+            return 'bg-purple-600';
+        case 'Magazine Article':
+            return 'bg-orange-600';
+        default:
+            return 'bg-gray-600';
+    }
+}
+
+// Helper function to create slug from name
+function createSlugFromName(name) {
+    return name.toLowerCase()
+        .replace(/[^a-z0-9 -]/g, '') // Remove special characters
+        .replace(/\s+/g, '-')        // Replace spaces with hyphens
+        .replace(/-+/g, '-');        // Replace multiple hyphens with single
+}
+
+// Load publications from Firebase - Updated with error handling
 async function loadPublications() {
     try {
         const snapshot = await db.collection('publications').orderBy('year', 'desc').limit(5).get();
@@ -77,9 +357,15 @@ async function loadPublications() {
                 const pub = doc.data();
                 html += `
                     <div class="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700" data-aos="fade-up">
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="text-xs px-2 py-1 rounded ${getPublicationTypeColor(pub.type)} text-white">
+                                ${pub.type || 'Paper'}
+                            </span>
+                            <span class="text-sm text-gray-400">${pub.year || 'N/A'}</span>
+                        </div>
                         <h4 class="text-xl font-bold text-white mb-2">${pub.title || 'Tiêu đề không rõ'}</h4>
                         <p class="text-sky-400 mb-2">${pub.authors || 'Tác giả không rõ'}</p>
-                        <p class="text-gray-400 text-sm mb-4">${pub.journal || 'Tạp chí không rõ'} (${pub.year || 'N/A'})</p>
+                        <p class="text-gray-400 text-sm mb-4"><em>${pub.journal || 'Tạp chí không rõ'}</em></p>
                         ${pub.abstract ? `
                             <button class="toggle-abstract text-sky-400 hover:text-sky-300 text-sm mb-2 focus:outline-none">
                                 Xem Abstract
@@ -88,14 +374,18 @@ async function loadPublications() {
                                 <p class="text-gray-300 text-sm p-4 bg-gray-700 rounded-lg">${pub.abstract}</p>
                             </div>
                         ` : ''}
-                        ${pub.url ? `
-                            <div class="mt-4">
+                        <div class="flex justify-between items-center mt-4">
+                            <div class="flex space-x-4 text-sm text-gray-400">
+                                ${pub.citations ? `<span><i data-lucide="quote" class="w-4 h-4 inline mr-1"></i>${pub.citations}</span>` : ''}
+                                ${pub.doi ? `<span>DOI: ${pub.doi}</span>` : ''}
+                            </div>
+                            ${pub.url ? `
                                 <a href="${pub.url}" target="_blank" class="text-sky-400 hover:text-sky-300 text-sm">
                                     <i data-lucide="external-link" class="inline w-4 h-4 mr-1"></i>
                                     Xem bài báo
                                 </a>
-                            </div>
-                        ` : ''}
+                            ` : ''}
+                        </div>
                     </div>
                 `;
             });
@@ -112,28 +402,36 @@ async function loadPublications() {
             if (typeof lucide !== 'undefined') {
                 lucide.createIcons();
             }
+        } else {
+            // Handle empty state
+            const publicationsContainer = document.querySelector('#publications .space-y-6');
+            if (publicationsContainer) {
+                publicationsContainer.innerHTML = `
+                    <div class="text-center py-8">
+                        <p class="text-gray-400">Chưa có công bố khoa học nào.</p>
+                    </div>
+                `;
+            }
         }
     } catch (error) {
         console.error('Error loading publications:', error);
-    }
-}
-
-// Setup abstract toggle functionality
-function setupAbstractToggles() {
-    document.querySelectorAll('.toggle-abstract').forEach(button => {
-        button.addEventListener('click', () => {
-            const content = button.nextElementSibling;
-            const isHidden = content.classList.contains('hidden');
-            
-            if (isHidden) {
-                content.classList.remove('hidden');
-                button.textContent = 'Ẩn Abstract';
+        const publicationsContainer = document.querySelector('#publications .space-y-6');
+        if (publicationsContainer) {
+            if (error.code === 'permission-denied') {
+                publicationsContainer.innerHTML = `
+                    <div class="text-center py-8">
+                        <p class="text-red-400">❌ Không thể tải danh sách công bố. Đang cập nhật quyền truy cập...</p>
+                    </div>
+                `;
             } else {
-                content.classList.add('hidden');
-                button.textContent = 'Xem Abstract';
+                publicationsContainer.innerHTML = `
+                    <div class="text-center py-8">
+                        <p class="text-red-400">❌ Lỗi khi tải công bố: ${error.message}</p>
+                    </div>
+                `;
             }
-        });
-    });
+        }
+    }
 }
 
 // Setup contact form

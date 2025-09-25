@@ -325,6 +325,113 @@
                 </form>
             </div>
         </section>
+
+        <!-- Member Profile Modal -->
+<div id="member-profile-modal" class="fixed inset-0 bg-black bg-opacity-75 hidden items-center justify-center z-50 p-4">
+    <div class="bg-gray-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <!-- Modal Header -->
+        <div class="sticky top-0 bg-gray-800 px-6 py-4 border-b border-gray-700 flex justify-between items-center">
+            <h2 class="text-2xl font-bold text-white">Profile khoa học</h2>
+            <button id="close-profile-modal" class="text-gray-400 hover:text-white p-2">
+                <i data-lucide="x" class="w-6 h-6"></i>
+            </button>
+        </div>
+        
+        <!-- Modal Content -->
+        <div class="p-6">
+            <!-- Loading State -->
+            <div id="profile-loading" class="text-center py-12">
+                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-400 mx-auto mb-4"></div>
+                <p class="text-gray-400">Đang tải profile...</p>
+            </div>
+            
+            <!-- Profile Content -->
+            <div id="profile-content" class="hidden">
+                <!-- Header Section -->
+                <div class="flex flex-col md:flex-row gap-6 mb-8">
+                    <!-- Avatar -->
+                    <div class="flex-shrink-0 text-center md:text-left">
+                        <img id="profile-avatar" src="" alt="" class="w-32 h-32 rounded-full mx-auto md:mx-0 mb-4 border-4 border-sky-500">
+                        <div class="space-y-2">
+                            <a id="profile-google-scholar" href="" target="_blank" class="inline-block bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-full text-sm transition-colors">
+                                <i data-lucide="graduation-cap" class="w-4 h-4 inline mr-1"></i>Google Scholar
+                            </a>
+                            <a id="profile-orcid" href="" target="_blank" class="inline-block bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-full text-sm transition-colors ml-2">
+                                <i data-lucide="user-check" class="w-4 h-4 inline mr-1"></i>ORCID
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <!-- Basic Info -->
+                    <div class="flex-1">
+                        <h3 id="profile-name" class="text-3xl font-bold text-white mb-2"></h3>
+                        <p id="profile-nickname" class="text-xl text-sky-400 mb-2"></p>
+                        <p id="profile-role" class="text-lg text-gray-300 mb-4"></p>
+                        <p id="profile-bio" class="text-gray-400 leading-relaxed"></p>
+                    </div>
+                </div>
+                
+                <!-- Tabs -->
+                <div class="border-b border-gray-700 mb-6">
+                    <nav class="flex space-x-8">
+                        <button class="profile-tab-btn active py-2 px-1 border-b-2 border-sky-500 text-sky-400 font-medium" data-tab="research">
+                            Hướng nghiên cứu
+                        </button>
+                        <button class="profile-tab-btn py-2 px-1 border-b-2 border-transparent text-gray-300 hover:text-white font-medium" data-tab="publications">
+                            Công bố khoa học
+                        </button>
+                        <button class="profile-tab-btn py-2 px-1 border-b-2 border-transparent text-gray-300 hover:text-white font-medium" data-tab="education">
+                            Học vấn & Thành tích
+                        </button>
+                    </nav>
+                </div>
+                
+                <!-- Tab Contents -->
+                <div class="tab-contents">
+                    <!-- Research Tab -->
+                    <div id="profile-tab-research" class="profile-tab-content">
+                        <h4 class="text-xl font-bold text-white mb-4">Hướng nghiên cứu chính</h4>
+                        <div id="profile-research-interests" class="flex flex-wrap gap-2">
+                            <!-- Research interests will be loaded here -->
+                        </div>
+                    </div>
+                    
+                    <!-- Publications Tab -->
+                    <div id="profile-tab-publications" class="profile-tab-content hidden">
+                        <div class="flex justify-between items-center mb-4">
+                            <h4 class="text-xl font-bold text-white">Công bố khoa học</h4>
+                            <span id="profile-publications-count" class="text-sm text-gray-400"></span>
+                        </div>
+                        <div id="profile-publications-list" class="space-y-4">
+                            <!-- Publications will be loaded here -->
+                        </div>
+                    </div>
+                    
+                    <!-- Education Tab -->
+                    <div id="profile-tab-education" class="profile-tab-content hidden">
+                        <div class="grid md:grid-cols-2 gap-6">
+                            <!-- Education -->
+                            <div>
+                                <h4 class="text-xl font-bold text-white mb-4">Học vấn</h4>
+                                <div id="profile-education" class="space-y-3">
+                                    <!-- Education will be loaded here -->
+                                </div>
+                            </div>
+                            
+                            <!-- Achievements -->
+                            <div>
+                                <h4 class="text-xl font-bold text-white mb-4">Thành tích & Giải thưởng</h4>
+                                <div id="profile-achievements" class="space-y-3">
+                                    <!-- Achievements will be loaded here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
     </main>
     
     <!-- Footer -->

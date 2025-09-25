@@ -107,3 +107,82 @@ button:focus, input:focus, textarea:focus {
         scroll-behavior: auto !important;
     }
 }
+
+/* Modal styles */
+.modal {
+    backdrop-filter: blur(8px);
+}
+
+/* Profile tabs */
+.profile-tab-btn.active {
+    color: #38bdf8;
+    border-bottom-color: #38bdf8;
+}
+
+.profile-tab-btn:hover {
+    color: white;
+}
+
+/* Member cards hover effect */
+.member-card {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.member-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
+}
+
+/* Publication type badges */
+.publication-type-badge {
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Scrollbar for modal */
+.max-h-\[90vh\]::-webkit-scrollbar {
+    width: 6px;
+}
+
+.max-h-\[90vh\]::-webkit-scrollbar-track {
+    background: #374151;
+}
+
+.max-h-\[90vh\]::-webkit-scrollbar-thumb {
+    background: #6B7280;
+    border-radius: 3px;
+}
+
+.max-h-\[90vh\]::-webkit-scrollbar-thumb:hover {
+    background: #9CA3AF;
+}
+
+/* Animation for profile cards */
+@keyframes slideInFromBottom {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.profile-content {
+    animation: slideInFromBottom 0.3s ease-out;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .member-profile-modal .bg-gray-800 {
+        margin: 1rem;
+        max-height: calc(100vh - 2rem);
+    }
+    
+    .member-card:hover {
+        transform: none;
+    }
+}
